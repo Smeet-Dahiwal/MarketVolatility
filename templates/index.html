@@ -3,16 +3,78 @@
 <head>
     <title>Market Volatility Checker</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        .day-section { margin-bottom: 30px; }
-        h2 { color: #333; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f6f8;
+            color: #2c3e50;
+        }
+        h1 {
+            text-align: center;
+            color: #16a085;
+        }
+        form {
+            text-align: center;
+            margin-bottom: 30px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: inline-block;
+        }
+        input, select, button {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #16a085;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #13876a;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            background: #fff;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        .day-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        h2 {
+            color: #2980b9;
+            margin-bottom: 15px;
+        }
+        .points-positive { color: green; font-weight: bold; }
+        .points-negative { color: red; font-weight: bold; }
+        .volatility { color: #e67e22; font-weight: bold; }
+        .highlight { background-color: #ffeb3b; font-weight:bold; }
     </style>
 </head>
 <body>
-    <h1>Market Volatility Checker</h1>
+    <h1>📈 Market Volatility Checker</h1>
 
     <form method="POST">
         <label>Symbol: </label>
@@ -20,13 +82,13 @@
             <option value="BTC-USD">BTC-USD</option>
             <option value="ETH-USD">ETH-USD</option>
             <option value="^NSEI">^NSEI</option>
-        </select><br><br>
+        </select>
 
         <label>Start Date: </label>
-        <input type="date" name="start" required><br><br>
+        <input type="date" name="start" required>
 
         <label>End Date: </label>
-        <input type="date" name="end" required><br><br>
+        <input type="date" name="end" required>
 
         <button type="submit">Check</button>
     </form>
@@ -51,11 +113,11 @@
                             <tr>
                                 <td>{{ row['Date'] }}</td>
                                 <td>{{ "%.2f"|format(row['Open']) }}</td>
-                                <td>{{ "%.2f"|format(row['Close']) }}</td><td style="color: {{ 'red' if row['Points'] < 0 else 'green' }}; font-weight:bold;">
+                                <td>{{ "%.2f"|format(row['Close']) }}</td>
+                                <td class="{{ 'points-negative' if row['Points'] < 0 else 'points-positive' }}">
                                     {{ "%.2f"|format(row['Points']) }}
                                 </td>
-
-                                <td>{{ "%.2f"|format(row['Volatility']) }}</td>
+                                <td class="volatility">{{ "%.2f"|format(row['Volatility']) }}</td>
                             </tr>
                         {% endfor %}
                     </table>
@@ -72,7 +134,7 @@
                 <th>Days_Count</th>
             </tr>
             {% for row in summary %}
-                <tr>
+                <tr {% if row['Day'] == most_volatile_day %} class="highlight" {% endif %}>
                     <td>{{ row['Day'] }}</td>
                     <td>{{ "%.2f"|format(row['Avg_Points']) }}</td>
                     <td>{{ "%.2f"|format(row['Avg_Volatility']) }}</td>
