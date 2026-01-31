@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Market Volatility Checker</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .day-section { margin-bottom: 30px; }
+        h2 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Market Volatility Checker</h1>
+
+    <form method="POST">
+        <label>Symbol: </label>
+        <select name="symbol">
+            <option value="BTC-USD">BTC-USD</option>
+            <option value="ETH-USD">ETH-USD</option>
+            <option value="^NSEI">^NSEI</option>
+        </select><br><br>
+
+        <label>Start Date: </label>
+        <input type="date" name="start" required><br><br>
+
+        <label>End Date: </label>
+        <input type="date" name="end" required><br><br>
+
+        <button type="submit">Check</button>
+    </form>
+
+    {% if daily %}
+        {% set weekdays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+        <h2>📊 Day-wise Market Movement</h2>
+        {% for day in weekdays %}
+            {% set day_data = daily | selectattr("Day", "equalto", day) | list %}
+            {% if day_data %}
+                <div class="day-section">
+                    <h3>🟦 {{ day }}</h3>
+                    <table>
+                        <tr>
+                            <th>Date</th>
+                            <th>Open</th>
+                            <th>Close</th>
+                            <th>Points</th>
+                            <th>Volatility</th>
+                        </tr>
+                        {% for row in day_data %}
+                            <tr>
+                                <td>{{ row['Date'] }}</td>
+                                <td>{{ "%.2f"|format(row['Open']) }}</td>
+                                <td>{{ "%.2f"|format(row['Close']) }}</td><td style="color: {{ 'red' if row['Points'] < 0 else 'green' }}; font-weight:bold;">
+                                    {{ "%.2f"|format(row['Points']) }}
+                                </td>
+
+                                <td>{{ "%.2f"|format(row['Volatility']) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <h2>📌 Summary (Average Volatility by Weekday)</h2>
+        <table>
+            <tr>
+                <th>Day</th>
+                <th>Avg_Points</th>
+                <th>Avg_Volatility</th>
+                <th>Days_Count</th>
+            </tr>
+            {% for row in summary %}
+                <tr>
+                    <td>{{ row['Day'] }}</td>
+                    <td>{{ "%.2f"|format(row['Avg_Points']) }}</td>
+                    <td>{{ "%.2f"|format(row['Avg_Volatility']) }}</td>
+                    <td>{{ row['Days_Count'] }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+
+        <h2>🔥 MOST VOLATILE DAY: {{ most_volatile_day }}</h2>
+    {% endif %}
+
+</body>
+</html>
