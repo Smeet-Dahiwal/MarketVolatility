@@ -1,5 +1,3 @@
-Here’s a **short and clean README** for your Market Volatility Checker app:
-
 ````markdown
 # Market Volatility Checker
 
