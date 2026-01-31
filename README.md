@@ -52,3 +52,6 @@ python app.py
 
 **Note:** Make sure you have an internet connection to fetch data from Yahoo Finance (`yfinance`).
 
+## Preview
+
+![Market Volatility Checker](img/Homepage.png)
