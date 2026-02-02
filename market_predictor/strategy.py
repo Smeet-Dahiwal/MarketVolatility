@@ -2,13 +2,10 @@
 
 def trend_score_1h(df):
     last = df.iloc[-1]
-
     if last['ema20'] > last['ema50']:
         return 30, "Bullish 1H trend"
-
     elif last['ema20'] < last['ema50']:
         return -30, "Bearish 1H trend"
-
     return 15, "Sideways 1H trend"
 
 
@@ -16,20 +13,16 @@ def candle_score(df):
     last = df.iloc[-1]
     body = abs(last['Close'] - last['Open'])
     wick = (last['High'] - last['Low']) - body
-
     if body > wick:
         return 25, "Strong candle"
-
     return 10, "Weak candle"
 
 
 def atr_score(df):
     atr = df.iloc[-1]['atr']
     avg_atr = df['atr'].mean()
-
     if atr > avg_atr:
         return 20, "High volatility expected"
-
     return 10, "Low volatility"
 
 
@@ -37,14 +30,12 @@ def support_resistance_score(df):
     last_price = df.iloc[-1]['Close']
     recent_low = df['Low'].tail(20).min()
     recent_high = df['High'].tail(20).max()
-
     if abs(last_price - recent_low) / last_price < 0.003:
         return 25, "Near support"
-
     if abs(last_price - recent_high) / last_price < 0.003:
         return -25, "Near resistance"
-
     return 10, "Mid-range price"
+
 
 def ema_trend_score(df):
     if df['ema20'].iloc[-1] > df['ema50'].iloc[-1]:
@@ -53,9 +44,9 @@ def ema_trend_score(df):
         return -15, "EMA bearish crossover"
     return 0, "EMA neutral"
 
+
 def rsi_score(df):
     rsi = df['rsi'].iloc[-1]
-
     if rsi < 30:
         return 10, "RSI oversold (bounce possible)"
     elif rsi > 70:
@@ -71,17 +62,14 @@ def rsi_score(df):
 def macd_score(df):
     if df['macd'].iloc[-1] > 0:
         return 10, "MACD bullish momentum"
-    else:
-        return -10, "MACD bearish momentum"
+    return -10, "MACD bearish momentum"
 
 
 def adx_score(df):
     adx = df['adx'].iloc[-1]
-
     if adx > 25:
         return 10, "Strong trend (ADX)"
-    else:
-        return -5, "Weak / choppy market"
+    return -5, "Weak / choppy market"
 
 
 def candle_pattern_score(df):
@@ -104,22 +92,19 @@ def candle_pattern_score(df):
 def vwap_score(df):
     price = df['Close'].iloc[-1]
     vwap = df['vwap'].iloc[-1]
-
     if price > vwap:
         return 10, "Price above VWAP (institutional bullish)"
-    else:
-        return -10, "Price below VWAP (institutional bearish)"
+    return -10, "Price below VWAP (institutional bearish)"
 
 
 def market_regime_score(df):
     adx = df['adx'].iloc[-1]
-
     if adx < 20:
         return -15, "Ranging market (avoid trend trades)"
     elif 20 <= adx <= 25:
         return 0, "Market transitioning"
-    else:
-        return 10, "Trending market"
+    return 10, "Trending market"
+
 
 def breakout_score(df):
     high = df['High'].iloc[-1]
@@ -144,22 +129,53 @@ def rsi_divergence_score(df):
         return 15, "Bullish RSI divergence"
     elif price_now > price_prev and rsi_now < rsi_prev:
         return -15, "Bearish RSI divergence"
-
     return 0, "No RSI divergence"
+
 
 def conflict_filter(reasons):
     bull = sum(1 for r in reasons if "bullish" in r.lower())
     bear = sum(1 for r in reasons if "bearish" in r.lower())
-
     if bull >= 3 and bear >= 3:
         return -20, "High signal conflict (no trade zone)"
     return 0, "Signals aligned"
 
 
+def expected_move_projection(df, confidence, bias):
+    atr = df['atr'].iloc[-1]
+    adx = df['adx'].iloc[-1]
+
+    if confidence < 65:
+        conf_mult = 0.5
+    elif confidence < 75:
+        conf_mult = 1.0
+    elif confidence < 85:
+        conf_mult = 1.5
+    else:
+        conf_mult = 2.0
+
+    if adx < 20:
+        trend_mult = 0.5
+    elif adx < 25:
+        trend_mult = 1.0
+    else:
+        trend_mult = 1.5
+
+    min_move = atr * conf_mult * 0.7
+    max_move = atr * conf_mult * trend_mult
+    direction = "up" if bias == "Bullish" else "down" if bias == "Bearish" else "range"
+
+    return {
+        "min_points": round(min_move, 2),
+        "max_points": round(max_move, 2),
+        "direction": direction
+    }
+
+
 def predict_next_candle(df_15m, df_1h):
-    score = 50  # start neutral
+    score = 50  # neutral start
     reasons = []
 
+    # Apply all indicator functions
     for fn in [
         market_regime_score,
         trend_score_1h,
@@ -171,12 +187,20 @@ def predict_next_candle(df_15m, df_1h):
         rsi_divergence_score,
         breakout_score,
         candle_pattern_score,
+        candle_score,
+        adx_score,
         atr_score
     ]:
         s, r = fn(df_15m if fn != trend_score_1h else df_1h)
         score += s
         reasons.append(r)
 
+    # Apply conflict filter
+    conflict_score, conflict_reason = conflict_filter(reasons)
+    score += conflict_score
+    reasons.append(conflict_reason)
+
+    # Clamp score 0-100
     score = max(0, min(score, 100))
 
     bias = "Neutral"
@@ -185,8 +209,11 @@ def predict_next_candle(df_15m, df_1h):
     elif score <= 35:
         bias = "Bearish"
 
+    expected_move = expected_move_projection(df_15m, score, bias)
+
     return {
         "bias": bias,
         "confidence": score,
+        "expected_move": expected_move,
         "reasons": reasons
     }

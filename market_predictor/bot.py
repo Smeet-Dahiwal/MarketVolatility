@@ -1,43 +1,53 @@
 import time
 from datetime import datetime
-from main import main as get_prediction
+from main import main as get_prediction  # our updated main.py
 
 # ================= CONFIG =================
-CHECK_INTERVAL_MINUTES = 5  # Check market every 15 minutes
-LOG_FILE = "market_bot.log"
+SYMBOLS = ["BTC-USD"]  # You can add multiple symbols here
 CONFIDENCE_THRESHOLD = 70
+CHECK_INTERVAL_MINUTES = 5
+LOG_FILE = "market_bot.log"
+
+
 # =========================================
 
 def log_message(msg):
     """Append log message to file with timestamp"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a", encoding="utf-8") as f:   # <-- FIX: UTF-8 encoding
+    with open(LOG_FILE, "a", encoding="utf-8") as f:   # <-- specify UTF-8
         f.write(f"[{timestamp}] {msg}\n")
     print(f"[{timestamp}] {msg}")
+
 
 
 def run_bot():
     log_message("🚀 Market Prediction Bot started")
 
     while True:
-        try:
-            # Fetch prediction from main.py
-            result = get_prediction(return_result=True)
+        for symbol in SYMBOLS:
+            try:
+                result = get_prediction(return_result=True)
 
-            if result:
-                msg = f"Symbol: {result['symbol']}, Bias: {result['bias']}, Confidence: {result['confidence']}%"
-                log_message(msg)
+                if result:
+                    bias = result['bias']
+                    confidence = result['confidence']
+                    move = result['expected_move']
 
-                # Alert only if confidence ≥ threshold (handled inside main.py)
-                if result['confidence'] >= CONFIDENCE_THRESHOLD:
-                    log_message("✅ Strong signal detected, alert sent")
+                    msg = (
+                        f"Symbol: {symbol}, Bias: {bias}, Confidence: {confidence}%, "
+                        f"Expected Move: {move['direction']} ({move['min_points']}-{move['max_points']} pts)"
+                    )
+                    log_message(msg)
+
+                    if confidence >= CONFIDENCE_THRESHOLD:
+                        log_message("✅ Strong signal detected, alert sent")
+                    else:
+                        log_message(f"🔕 Confidence below threshold, no alert sent")
                 else:
-                    log_message(f"🔕 Confidence below threshold ({result['confidence']}% < {CONFIDENCE_THRESHOLD}%), no alert sent")
-            else:
-                log_message("❌ Failed to get prediction")
+                    log_message(f"❌ Failed to get prediction for {symbol}")
 
-        except Exception as e:
-            log_message(f"❌ Error: {str(e)}")
+            except Exception as e:
+                log_message(f"❌ Error for {symbol}: {str(e)}")
 
         log_message(f"⏳ Sleeping for {CHECK_INTERVAL_MINUTES} minutes...\n")
         time.sleep(CHECK_INTERVAL_MINUTES * 60)
