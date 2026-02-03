@@ -1,22 +1,26 @@
+# alerts.py
 import os
-from twilio.rest import Client
 import requests
+from twilio.rest import Client
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("TELEGRAM_GROUP_ID")
 
-def send_telegram_alert(message: str):
+def send_telegram_alert(message: str) -> bool:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": GROUP_CHAT_ID,
         "text": message,
-        "parse_mode": "HTML"   # allows bold, italics, links
+        "parse_mode": "HTML"
     }
     r = requests.post(url, data=payload)
+
     if r.status_code != 200:
         print("❌ Telegram alert failed:", r.text)
-    else:
-        print("✅ Telegram alert sent")
+        return False
+
+    print("✅ Telegram alert sent")
+    return True
 
 
 def send_whatsapp_alert(message: str):
