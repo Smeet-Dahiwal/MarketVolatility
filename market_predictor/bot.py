@@ -1,7 +1,10 @@
 # bot.py
 import time
 from datetime import datetime
-from main import main as get_prediction
+try:
+    from main import main as get_prediction
+except:
+    from market_predictor.main import main as get_prediction
 
 # ================= CONFIG =================
 SYMBOLS = ["BTC-USD"]  # Add more: ["BTC-USD", "ETH-USD"]

@@ -1,0 +1,4 @@
+PATTERN_DB_PATH = "patterns.db"  # local file created in same folder where you run backtester
+EMBED_WINDOW = 32
+FUTURE_BARS = 8
+BATCH_COMMIT = 200

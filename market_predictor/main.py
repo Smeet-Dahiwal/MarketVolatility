@@ -1,10 +1,16 @@
 # main.py
 from datetime import datetime
 from html import escape  # ✅ IMPORTANT
-from data_fetcher import fetch_data
-from indicators import add_indicators
-from strategy import predict_next_candle
-from alerts import send_telegram_alert
+from market_predictor.data_fetcher import fetch_data
+from market_predictor.indicators import add_indicators
+from market_predictor.strategy import predict_next_candle
+from market_predictor.alerts import send_telegram_alert
+
+# from market_predictor.data_fetcher import fetch_data
+# from market_predictor.indicators import add_indicators
+# from market_predictor.strategy import predict_next_candle
+# from market_predictor.alerts import send_telegram_alert
+
 
 CONFIDENCE_THRESHOLD = 70
 
