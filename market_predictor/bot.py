@@ -1,58 +1,68 @@
-# bot.py
+# market_predictor/bot.py
 import time
 from datetime import datetime
+
+from market_predictor.data_fetcher import fetch_data
+from market_predictor.db import init_db, kv_get, kv_set
+
 try:
-    from main import main as get_prediction
-except:
-    from market_predictor.main import main as get_prediction
+    from main import main as run_once
+except Exception:
+    from market_predictor.main import main as run_once
+
 
 # ================= CONFIG =================
-SYMBOLS = ["BTC-USD"]  # Add more: ["BTC-USD", "ETH-USD"]
-CONFIDENCE_THRESHOLD = 70
-CHECK_INTERVAL_MINUTES = 5
+SYMBOLS = ["BTC-USD"]
+CHECK_INTERVAL_SECONDS = 60  # check every 1 minute
 LOG_FILE = "market_bot.log"
+DB_PATH = "market_predictor.db"
 # =========================================
 
 
 def log_message(msg: str):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] {msg}"
+    print(line)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {msg}\n")
-    print(f"[{timestamp}] {msg}")
+        f.write(line + "\n")
+
+
+def last_closed_15m(symbol: str) -> str | None:
+    df = fetch_data(symbol, "15m", "2d", only_closed=True)
+    if df is None or df.empty:
+        return None
+    return str(df.index[-1])
 
 
 def run_bot():
-    log_message("🚀 Market Prediction Bot started")
+    init_db(DB_PATH)
+    log_message("🚀 Bot started (1-min loop, triggers only on NEW 15m candle close, state in SQLite)")
 
     while True:
         for symbol in SYMBOLS:
             try:
-                result = get_prediction(symbol=symbol, return_result=True)
+                last15 = last_closed_15m(symbol)
+                if not last15:
+                    log_message(f"❌ {symbol}: cannot detect last closed 15m candle")
+                    continue
 
-                if result:
-                    trade_type = result.get("trade_type", "NO_TRADE")
-                    bias = result.get("bias", "Neutral")
-                    confidence = int(result.get("confidence", 0))
-                    move = result.get("expected_move", {})
+                key = f"last_15m_closed::{symbol}"
+                prev15 = kv_get(key, DB_PATH)
 
-                    msg = (
-                        f"Symbol: {symbol}, TradeType: {trade_type}, Bias: {bias}, Confidence: {confidence}%, "
-                        f"Expected Move: {move.get('direction')} ({move.get('min_points')}-{move.get('max_points')} pts)"
-                    )
-                    log_message(msg)
+                if prev15 == last15:
+                    # no new candle close -> do nothing
+                    continue
 
-                    if trade_type != "NO_TRADE" and confidence >= CONFIDENCE_THRESHOLD:
-                        log_message("✅ Strong setup detected (alert handled in main.py)")
-                    else:
-                        log_message("🔕 No strong setup / no trade")
-                else:
-                    log_message(f"❌ Failed to get prediction for {symbol}")
+                kv_set(key, last15, DB_PATH)
+                log_message(f"⏱️ New 15m candle closed for {symbol} at {last15}. Running strategy...")
+
+                # main() handles alerts + DB writes (signals/alerts/trades)
+                run_once(symbol=symbol, return_result=False)
 
             except Exception as e:
-                log_message(f"❌ Error for {symbol}: {str(e)}")
+                log_message(f"❌ {symbol}: error: {e}")
 
-        log_message(f"⏳ Sleeping for {CHECK_INTERVAL_MINUTES} minutes...\n")
-        time.sleep(CHECK_INTERVAL_MINUTES * 60)
+        time.sleep(CHECK_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

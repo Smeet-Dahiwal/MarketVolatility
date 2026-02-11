@@ -827,7 +827,12 @@ def detect_pullback_trend(df_15m, df_1h, cap: int) -> Optional[Dict]:
 # ---------------------------
 # Breakout module
 # ---------------------------
-def _breakout_trigger(df_15m, direction: str) -> Tuple[bool, List[str]]:
+def _breakout_trigger(df_15m, direction: str) -> Tuple[bool, List[str], float, str]:
+    """
+    Returns:
+      (triggered, reasons, breakout_level, breakout_side)
+    breakout_side: "ABOVE" for bullish breakout, "BELOW" for bearish breakdown
+    """
     reasons = []
     high = _last(df_15m, "High")
     low = _last(df_15m, "Low")
@@ -837,18 +842,20 @@ def _breakout_trigger(df_15m, direction: str) -> Tuple[bool, List[str]]:
     prev_low = _rolling_min(df_15m, "Low", CFG.breakout_lookback, shift=1)
 
     if direction == "BULL":
-        if high > prev_high and close > prev_high:
-            reasons.append(f"Breakout above {CFG.breakout_lookback}-candle high")
-            return True, reasons
-        return False, ["No bullish breakout trigger"]
+        level = prev_high
+        if high > level and close > level:
+            reasons.append(f"Breakout above {CFG.breakout_lookback}-candle high ({level:.2f})")
+            return True, reasons, float(level), "ABOVE"
+        return False, ["No bullish breakout trigger"], float(level), "ABOVE"
 
     if direction == "BEAR":
-        if low < prev_low and close < prev_low:
-            reasons.append(f"Breakdown below {CFG.breakout_lookback}-candle low")
-            return True, reasons
-        return False, ["No bearish breakout trigger"]
+        level = prev_low
+        if low < level and close < level:
+            reasons.append(f"Breakdown below {CFG.breakout_lookback}-candle low ({level:.2f})")
+            return True, reasons, float(level), "BELOW"
+        return False, ["No bearish breakout trigger"], float(level), "BELOW"
 
-    return False, ["Breakout not applicable (no trend)"]
+    return False, ["Breakout not applicable (no trend)"], 0.0, "NA"
 
 
 def detect_breakout_trend(df_15m, df_1h, cap: int) -> Optional[Dict]:
@@ -856,7 +863,7 @@ def detect_breakout_trend(df_15m, df_1h, cap: int) -> Optional[Dict]:
     if direction not in ("BULL", "BEAR"):
         return None
 
-    trig, trig_reasons = _breakout_trigger(df_15m, direction)
+    trig, trig_reasons, breakout_level, breakout_side = _breakout_trigger(df_15m, direction)
     if not trig:
         return None
 
