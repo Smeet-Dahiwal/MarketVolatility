@@ -32,7 +32,7 @@ from market_predictor.db import init_db
 DB_PATH = "market_predictor.db"
 CSV_OUT = "backtest_results.csv"
 
-SYMBOL = "BTC-USD"
+SYMBOL = "XAUUSD=X"
 
 # Backtest horizon
 SETUP_PERIOD = "180d"   # 15m
@@ -293,7 +293,7 @@ def run_backtest(symbol: str = SYMBOL) -> None:
             continue
 
         # Strategy decision (1H + 15m)
-        res = predict_next_candle(df15_slice, df1h_slice)
+        res = predict_next_candle(df15_slice, df1h_slice, df_5m=df5m_slice)
 
         trade_type = res.get("trade_type", "NO_TRADE")
         bias = res.get("bias", "Neutral")

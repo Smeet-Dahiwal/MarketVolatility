@@ -2,7 +2,6 @@
 from datetime import datetime
 from html import escape
 import hashlib
-import json
 
 from market_predictor.data_fetcher import fetch_data
 from market_predictor.indicators import add_indicators
@@ -75,7 +74,7 @@ def _indicators_dict(df_1h, df_15m, df_5m=None) -> dict:
             return {}
         row = df.iloc[-1]
         out = {}
-        for k in ["Close", "ema20", "ema50", "rsi", "adx", "atr", "vwap", "macd"]:
+        for k in ["Close", "ema20", "ema50", "rsi", "adx", "atr", "atr_pct", "vwap", "macd"]:
             if k in df.columns:
                 try:
                     out[k] = float(row[k])
@@ -113,7 +112,42 @@ def _hash_message(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def format_alert(symbol: str, result: dict, alert_kind: str, extra_lines=None, indicator_lines=None) -> str:
+def _pattern_lines(result: dict) -> list[str]:
+    """
+    Expected result["patterns"] format:
+      {
+        "5m":  [ {"name":..., "kind":..., "direction":..., "confidence":...}, ... ],
+        "15m": [ ... ]
+      }
+    """
+    patterns = result.get("patterns") or {}
+    out: list[str] = []
+
+    def top2(tf: str):
+        items = patterns.get(tf) or []
+        if not isinstance(items, list):
+            return []
+        return items[:2]
+
+    for tf in ("5m", "15m"):
+        items = top2(tf)
+        for i, p in enumerate(items, start=1):
+            name = p.get("name", "Unknown")
+            kind = p.get("kind", "")
+            direction = p.get("direction", "")
+            conf = p.get("confidence", "")
+            out.append(f"{tf} P{i}: {name} ({kind}) – {direction} ({conf}%)")
+
+    return out
+
+
+def format_alert(
+    symbol: str,
+    result: dict,
+    alert_kind: str,
+    extra_lines=None,
+    indicator_lines=None,
+) -> str:
     extra_lines = extra_lines or []
     indicator_lines = indicator_lines or []
 
@@ -138,6 +172,13 @@ def format_alert(symbol: str, result: dict, alert_kind: str, extra_lines=None, i
 
     header = "✅ <b>ENTRY ALERT</b>" if alert_kind == "ENTRY" else "🟡 <b>SETUP ALERT</b>"
 
+    # Patterns block (Top 2 per TF)
+    pat_lines = _pattern_lines(result)
+    if not pat_lines:
+        pat_text = "- (no strong pattern match)"
+    else:
+        pat_text = "\n".join([f"- {escape(x)}" for x in pat_lines])
+
     trade_text = ""
     if trade and alert_kind == "ENTRY":
         trade_text = f"""
@@ -146,7 +187,7 @@ def format_alert(symbol: str, result: dict, alert_kind: str, extra_lines=None, i
 <b>Stop Loss:</b> {escape(str(trade.get('stop_loss')))}
 <b>Take Profit:</b> {escape(str(trade.get('take_profit')))}
 <b>Risk:Reward:</b> 1:{escape(str(trade.get('rr')))}
-"""
+""".rstrip()
         if trade.get("note"):
             trade_text += f"\n<b>Note:</b> {escape(str(trade.get('note')))}\n"
 
@@ -161,6 +202,9 @@ def format_alert(symbol: str, result: dict, alert_kind: str, extra_lines=None, i
 
 📈 <b>Expected Move:</b> {safe_dir}
 <b>Range:</b> {safe_minp} - {safe_maxp}
+
+🔎 <b>Pattern Match (Top 2)</b>
+{pat_text}
 
 📌 <b>Key Indicators:</b>
 {ind_text}
@@ -189,11 +233,13 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
     df_15m = add_indicators(df_15m)
     df_1h = add_indicators(df_1h)
 
-    indicator_lines = []
+    indicator_lines: list[str] = []
     indicator_lines += _snap_indicators(df_1h, "1H")
     indicator_lines += _snap_indicators(df_15m, "15m")
 
-    result = predict_next_candle(df_15m, df_1h)
+    # First pass decision (no 5m yet)
+    # NOTE: this requires your strategy.predict_next_candle signature to accept (df_15m, df_1h, df_5m=None)
+    result = predict_next_candle(df_15m, df_1h, df_5m=None)
 
     trade_type = result.get("trade_type", "NO_TRADE")
     bias = result.get("bias", "Neutral")
@@ -220,6 +266,7 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
         "reasons": result.get("reasons", []) or [],
         "indicators": _indicators_dict(df_1h, df_15m),
         "fingerprint": fp,
+        "patterns": result.get("patterns", {}),
     }
     insert_signal(sig_payload, DB_PATH)
 
@@ -234,13 +281,17 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
         print("🔕 No alert sent (NO_TRADE or low confidence or missing trade plan)")
         return result if return_result else None
 
-    # 5m entry timing check (only when setup exists)
+    # Fetch 5m (only when setup exists)
     df_5m = fetch_data(symbol, "5m", "5d", only_closed=True)
     if df_5m.empty:
         if SEND_SETUP_ALERT:
             kind = "SETUP"
             if should_send_alert(symbol, kind, fp, SETUP_COOLDOWN_MIN, DB_PATH):
-                msg = format_alert(symbol, result, alert_kind="SETUP", extra_lines=["5m data fetch failed"], indicator_lines=indicator_lines)
+                msg = format_alert(
+                    symbol, result, alert_kind="SETUP",
+                    extra_lines=["5m data fetch failed"],
+                    indicator_lines=indicator_lines,
+                )
                 ok = send_telegram_alert(msg)
                 insert_alert(
                     {
@@ -256,7 +307,15 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
                 )
             else:
                 insert_alert(
-                    {"ts": ts, "symbol": symbol, "kind": kind, "fingerprint": fp, "status": "SKIPPED", "error": "cooldown", "message_hash": None},
+                    {
+                        "ts": ts,
+                        "symbol": symbol,
+                        "kind": kind,
+                        "fingerprint": fp,
+                        "status": "SKIPPED",
+                        "error": "cooldown",
+                        "message_hash": None,
+                    },
                     DB_PATH,
                 )
         return result if return_result else None
@@ -264,13 +323,21 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
     df_5m = add_indicators(df_5m)
     indicator_lines += _snap_indicators(df_5m, "5m")
 
-    # Update signal indicators with 5m snapshot (optional but useful)
-    sig_payload["indicators"] = _indicators_dict(df_1h, df_15m, df_5m)
-    # Store another row? For simplicity, we keep the initial signal row as is.
+    # Second pass: enrich result with 5m context (patterns/trend summaries)
+    # IMPORTANT: we keep original setup decision (trade_type/bias/trade) unless your strategy changes it.
+    enriched = predict_next_candle(df_15m, df_1h, df_5m=df_5m)
+
+    # Keep the original trade plan decision (first pass) if enriched accidentally returns NO_TRADE
+    # (This avoids losing the setup after fetching 5m.)
+    if enriched and isinstance(enriched, dict):
+        # merge only non-decision fields safely
+        for k in ("patterns", "tf_trends", "reasons"):
+            if k in enriched:
+                result[k] = enriched[k]
 
     # ENTRY CONFIRMATION:
-    # - Pullback: normal 5m confirmation
     # - Breakout: breakout retest + rejection + confirmation
+    # - Pullback: normal 5m confirmation
     if trade_type == "BREAKOUT_TREND":
         level = result.get("breakout_level")
         if level is None:
@@ -327,7 +394,15 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
 
     if kind == "SETUP" and not SEND_SETUP_ALERT:
         insert_alert(
-            {"ts": ts, "symbol": symbol, "kind": kind, "fingerprint": fp, "status": "SKIPPED", "error": "setup_alert_disabled", "message_hash": None},
+            {
+                "ts": ts,
+                "symbol": symbol,
+                "kind": kind,
+                "fingerprint": fp,
+                "status": "SKIPPED",
+                "error": "setup_alert_disabled",
+                "message_hash": None,
+            },
             DB_PATH,
         )
         return result if return_result else None
@@ -350,7 +425,15 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
         print("✅ Telegram alert sent" if ok else "❌ Telegram alert failed")
     else:
         insert_alert(
-            {"ts": ts, "symbol": symbol, "kind": kind, "fingerprint": fp, "status": "SKIPPED", "error": "cooldown", "message_hash": None},
+            {
+                "ts": ts,
+                "symbol": symbol,
+                "kind": kind,
+                "fingerprint": fp,
+                "status": "SKIPPED",
+                "error": "cooldown",
+                "message_hash": None,
+            },
             DB_PATH,
         )
         print("🔁 Alert skipped due to cooldown (already sent recently)")

@@ -1,90 +1,101 @@
-# market_predictor/data_fetcher.py
-import time
 import pandas as pd
-
+import yfinance as yf
 import ccxt
+from datetime import datetime, timedelta, timezone
 
+def _is_yahoo_symbol(symbol: str) -> bool:
+    # Yahoo patterns: XAUUSD=X, GC=F, AAPL, GOLDBEES.NS, etc.
+    return (
+        ("=" in symbol) or
+        symbol.endswith(".NS") or
+        symbol.endswith(".BO")
+    )
 
-# Map Yahoo style symbols -> Binance symbols
-def _to_binance_symbol(symbol: str) -> str:
-    # BTC-USD -> BTC/USDT
-    if symbol.endswith("-USD"):
-        base = symbol.replace("-USD", "")
-        return f"{base}/USDT"
-    # If user passes already "BTC/USDT", keep it
-    if "/" in symbol:
-        return symbol
-    # Fallback: assume USDT quote
-    return f"{symbol}/USDT"
-
-
-def _days_from_period(period: str) -> int:
+def _yf_allowed_period(tf: str, requested: str) -> str:
     """
-    Accepts: "5d", "60d", "180d", "1y", "6mo"
+    yfinance has limits for intraday:
+      - 1m: up to 7d
+      - 2m/5m/15m/30m/60m/90m: up to 60d
+      - 1h/1d: much longer (years)
+    We'll cap automatically so your backtest doesn't crash.
     """
-    p = period.strip().lower()
-    if p.endswith("d"):
-        return int(p[:-1])
-    if p.endswith("mo"):
-        return int(p[:-2]) * 30
-    if p.endswith("y"):
-        return int(p[:-1]) * 365
-    # default
-    return 30
+    tf = tf.lower()
+    intraday = tf in ("1m","2m","5m","15m","30m","60m","90m","1h")
 
+    if tf == "1m":
+        return "7d"
+    if tf in ("2m","5m","15m","30m","60m","90m"):
+        return "60d"
+    # 1h and above can use requested safely (keep your requested)
+    return requested if requested else "365d"
 
-def _drop_last_open_candle(df: pd.DataFrame) -> pd.DataFrame:
-    # safest: last candle might still be forming
-    if df is None or df.empty:
+def fetch_data(symbol: str, timeframe: str, period: str, only_closed: bool = True):
+    timeframe = timeframe.lower()
+
+    # ---------- YFINANCE PATH ----------
+    if _is_yahoo_symbol(symbol):
+        yf_period = _yf_allowed_period(timeframe, period)
+        df = yf.download(
+            symbol,
+            period=yf_period,
+            interval=timeframe,
+            auto_adjust=False,
+            progress=False,
+            threads=True,
+        )
+
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        # yfinance index can be tz-aware; normalize
+        df = df.copy()
+        df.index = pd.to_datetime(df.index)
+        df = df.rename(columns=lambda c: c.strip().title())
+
+        # Keep only expected cols
+        keep = [c for c in ["Open","High","Low","Close","Volume"] if c in df.columns]
+        df = df[keep].dropna()
+
+        # only_closed: last candle might be still forming, drop it for safety
+        if only_closed and len(df) > 1:
+            df = df.iloc[:-1]
+
         return df
-    return df.iloc[:-1].copy() if len(df) > 1 else df
 
-
-def fetch_data(symbol: str, interval: str, period: str, only_closed: bool = True) -> pd.DataFrame:
-    """
-    CCXT-only fetcher (Binance spot).
-    interval: "5m", "15m", "1h"
-    period: "5d", "60d", "180d", "1y"
-    """
+    # ---------- CCXT PATH (CRYPTO) ----------
     ex = ccxt.binance({"enableRateLimit": True})
-    ccxt_symbol = _to_binance_symbol(symbol)
 
-    timeframe_map = {"5m": "5m", "15m": "15m", "1h": "1h"}
-    if interval not in timeframe_map:
-        raise ValueError(f"Unsupported interval: {interval}. Use one of {list(timeframe_map.keys())}")
+    # If user already passed "BTC/USDT" keep it, else default to /USDT
+    if "/" in symbol:
+        ccxt_symbol = symbol
+    else:
+        ccxt_symbol = f"{symbol}/USDT"
 
-    tf = timeframe_map[interval]
-    days = _days_from_period(period)
+    # period like "180d" -> since_ms
+    days = int(period.replace("d", "")) if period and period.endswith("d") else 60
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since_ms = int(since.timestamp() * 1000)
 
-    since_ms = int((pd.Timestamp.utcnow() - pd.Timedelta(days=days)).timestamp() * 1000)
-
+    limit = 1000
     all_rows = []
-    limit = 1000  # Binance max per call typically 1000
     while True:
-        ohlcv = ex.fetch_ohlcv(ccxt_symbol, timeframe=tf, since=since_ms, limit=limit)
+        ohlcv = ex.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, since=since_ms, limit=limit)
         if not ohlcv:
             break
-
         all_rows.extend(ohlcv)
-
-        last_ts = ohlcv[-1][0]
-        since_ms = last_ts + 1
-
-        # If returned less than limit, we likely reached “now”
+        since_ms = ohlcv[-1][0] + 1
         if len(ohlcv) < limit:
             break
-
-        time.sleep(ex.rateLimit / 1000)
 
     if not all_rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(all_rows, columns=["Datetime", "Open", "High", "Low", "Close", "Volume"])
-    df["Datetime"] = pd.to_datetime(df["Datetime"], unit="ms", utc=True).dt.tz_convert(None)
-    df.set_index("Datetime", inplace=True)
-    df = df.sort_index()
+    df = pd.DataFrame(all_rows, columns=["Timestamp","Open","High","Low","Close","Volume"])
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms", utc=True)
+    df.set_index("Timestamp", inplace=True)
+    df = df.astype(float)
 
-    if only_closed:
-        df = _drop_last_open_candle(df)
+    if only_closed and len(df) > 1:
+        df = df.iloc[:-1]
 
     return df

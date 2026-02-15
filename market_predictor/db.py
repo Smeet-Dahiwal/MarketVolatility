@@ -1,9 +1,8 @@
 # market_predictor/db.py
-import os
 import sqlite3
 import time
 import json
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 
 DB_PATH_DEFAULT = "market_predictor.db"
 
@@ -18,13 +17,18 @@ def _connect(db_path: str) -> sqlite3.Connection:
     return con
 
 
+def _table_columns(con: sqlite3.Connection, table: str) -> set[str]:
+    rows = con.execute(f"PRAGMA table_info({table});").fetchall()
+    return {r["name"] for r in rows}
+
+
 def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
     con = _connect(db_path)
     try:
         con.execute("PRAGMA journal_mode=WAL;")
         con.execute("PRAGMA synchronous=NORMAL;")
 
-        # Key-value state (for candle-close scheduler etc.)
+        # Key-value state
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS kv_state (
@@ -35,7 +39,7 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             """
         )
 
-        # Signals: every time we evaluate strategy (per symbol)
+        # Signals
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS signals (
@@ -60,7 +64,14 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol_ts ON signals(symbol, ts);")
         con.execute("CREATE INDEX IF NOT EXISTS idx_signals_fp ON signals(fingerprint);")
 
-        # Trades: refined trade plans (entry/SL/TP)
+        # ---- Migration: add patterns_json to signals (if missing) ----
+        cols = _table_columns(con, "signals")
+        if "patterns_json" not in cols:
+            con.execute("ALTER TABLE signals ADD COLUMN patterns_json TEXT;")
+            # Optional index for pattern searches later (not necessary now)
+            # con.execute("CREATE INDEX IF NOT EXISTS idx_signals_patterns ON signals(symbol, ts);")
+
+        # Trades
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS trades (
@@ -81,7 +92,7 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol_ts ON trades(symbol, ts);")
         con.execute("CREATE INDEX IF NOT EXISTS idx_trades_fp ON trades(fingerprint);")
 
-        # Alerts: what we actually attempted to send
+        # Alerts
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS alerts (
@@ -99,7 +110,7 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_alerts_symbol_ts ON alerts(symbol, ts);")
         con.execute("CREATE INDEX IF NOT EXISTS idx_alerts_kind_fp ON alerts(kind, fingerprint);")
 
-        # Backtest trades: store outcomes for calibration & metrics (Phase 1)
+        # Backtest trades
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS backtest_trades (
@@ -121,7 +132,7 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_bt_symbol_ts ON backtest_trades(symbol, ts);")
         con.execute("CREATE INDEX IF NOT EXISTS idx_bt_type_bias ON backtest_trades(trade_type, bias);")
 
-        # Patterns + calibration tables are Phase 2 (schema reserved)
+        # Phase-2 reserved tables
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS patterns (
@@ -146,7 +157,7 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
                 symbol TEXT NOT NULL,
                 trade_type TEXT NOT NULL,
                 bias TEXT NOT NULL,
-                bucket_json TEXT NOT NULL,       -- e.g., {"adx":"25-30","atrp":"0.3-0.6","entry":"2of3"}
+                bucket_json TEXT NOT NULL,
                 sample_size INTEGER NOT NULL,
                 win_rate REAL NOT NULL,
                 avg_r REAL NOT NULL
@@ -192,9 +203,6 @@ def should_send_alert(
     cooldown_minutes: int,
     db_path: str = DB_PATH_DEFAULT,
 ) -> bool:
-    """
-    Cooldown dedup: if same (kind + fingerprint) was SENT within cooldown -> False
-    """
     con = _connect(db_path)
     try:
         cutoff = now_ts() - int(cooldown_minutes * 60)
@@ -212,10 +220,11 @@ def should_send_alert(
         con.close()
 
 
-def insert_signal(
-    payload: Dict[str, Any],
-    db_path: str = DB_PATH_DEFAULT,
-) -> int:
+def insert_signal(payload: Dict[str, Any], db_path: str = DB_PATH_DEFAULT) -> int:
+    """
+    payload may optionally include:
+      - patterns: dict (stored into patterns_json)
+    """
     con = _connect(db_path)
     try:
         cur = con.execute(
@@ -224,9 +233,10 @@ def insert_signal(
                 ts, symbol, tf_trend, tf_setup, tf_entry,
                 trade_type, bias, confidence,
                 expected_direction, expected_min, expected_max,
-                reasons_json, indicators_json, fingerprint
+                reasons_json, indicators_json, fingerprint,
+                patterns_json
             )
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["ts"],
@@ -243,6 +253,7 @@ def insert_signal(
                 json.dumps(payload.get("reasons", []), ensure_ascii=False),
                 json.dumps(payload.get("indicators", {}), ensure_ascii=False),
                 payload.get("fingerprint"),
+                json.dumps(payload.get("patterns", {}), ensure_ascii=False),
             ),
         )
         con.commit()
@@ -251,10 +262,7 @@ def insert_signal(
         con.close()
 
 
-def insert_trade(
-    payload: Dict[str, Any],
-    db_path: str = DB_PATH_DEFAULT,
-) -> int:
+def insert_trade(payload: Dict[str, Any], db_path: str = DB_PATH_DEFAULT) -> int:
     con = _connect(db_path)
     try:
         cur = con.execute(
@@ -284,10 +292,7 @@ def insert_trade(
         con.close()
 
 
-def insert_alert(
-    payload: Dict[str, Any],
-    db_path: str = DB_PATH_DEFAULT,
-) -> int:
+def insert_alert(payload: Dict[str, Any], db_path: str = DB_PATH_DEFAULT) -> int:
     con = _connect(db_path)
     try:
         cur = con.execute(
