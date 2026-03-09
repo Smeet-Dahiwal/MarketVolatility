@@ -52,14 +52,25 @@ jobs:
 
       - name: Copy application files
         run: |
-          shopt -s extglob
-          cp -r !(build|.git|.github|venv|.venv|__pycache__) "${BUILD_DIR}/" || true
+          rsync -av \
+            --exclude='build' \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='venv' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            ./ "${BUILD_DIR}/"
 
       - name: Remove unwanted files
         run: |
-          find "${BUILD_DIR}" -type d -name "__pycache__" -exec rm -rf {} +
-          find "${BUILD_DIR}" -type f -name "*.pyc" -delete
-          find "${BUILD_DIR}" -type f -name "*.pyo" -delete
+          find "${BUILD_DIR}" -type d -name "__pycache__" -exec rm -rf {} + || true
+          find "${BUILD_DIR}" -type f -name "*.pyc" -delete || true
+          find "${BUILD_DIR}" -type f -name "*.pyo" -delete || true
+
+      - name: Show build contents
+        run: |
+          echo "===== BUILD DIRECTORY CONTENT ====="
+          find "${BUILD_DIR}" -type f | sort
 
       - name: Create Lambda zip package
         run: |
