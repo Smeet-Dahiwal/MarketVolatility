@@ -1,0 +1,372 @@
+{% extends "stock_analyzer/base.html" %}
+
+{% block title %}{{ stock.symbol }} Deep Dive Analysis • BullGuard.AI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <!-- Top Header Breadcrumb & Actions -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem;">
+        NSE/BSE Listed Indian Stock • {{ stock.sector }}
+      </div>
+      <h1 style="font-size: 2.2rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 0.75rem;">
+        {{ stock.symbol }}
+        <span style="font-size: 1.3rem; font-weight: 500; color: var(--text-muted);">{{ stock.name }}</span>
+      </h1>
+    </div>
+
+    <!-- Live Price & Refresh -->
+    <div style="text-align: right;">
+      <div id="livePriceContainer" style="padding: 0.2rem 0.5rem; border-radius: 8px; transition: background 0.4s ease; display: inline-block;">
+        <div id="liveStockPrice" style="font-size: 2.2rem; font-weight: 800; font-family: var(--font-mono); color: #fff;">
+          ₹{{ stock.current_price|floatformat:2 }}
+        </div>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">
+        52W High: <strong style="color: var(--accent-green);">₹{{ stock.fifty_two_week_high|floatformat:1 }}</strong> | 
+        52W Low: <strong style="color: var(--accent-rose);">₹{{ stock.fifty_two_week_low|floatformat:1 }}</strong>
+      </div>
+      <div style="margin-top: 0.5rem; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+        <span id="liveSyncStatusBadge" class="badge badge-accumulate" style="font-size: 0.72rem; letter-spacing: 0.03em;">
+          🟢 LIVE TICK: AUTO-SYNC (10s)
+        </span>
+        <a href="?refresh=1" class="btn btn-secondary btn-sm" title="Force deep refresh">
+          🔄 Deep Refresh
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main 2-Column Grid -->
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    
+    <!-- Left Column: Interactive 1-Year Technical Chart -->
+    <div class="glass-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          📈 1-Year Price Action & Trend Indicators (50 & 200 EMA)
+        </h2>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">
+          <span style="color: #06b6d4; font-weight: 600;">■ 50 EMA</span> | 
+          <span style="color: #f59e0b; font-weight: 600;">■ 200 EMA</span>
+        </div>
+      </div>
+
+      <!-- Plotly Chart Container -->
+      <div id="stockPriceChart" style="width: 100%; height: 480px;"></div>
+    </div>
+
+    <!-- Right Column: AI Prediction & Risk Controls Card -->
+    <div class="glass-card" style="border: 1px solid var(--border-glow);">
+      <div class="card-header">
+        <h2 class="card-title">
+          🤖 AI Prediction & Target Card
+        </h2>
+        {% if prediction.action == 'STRONG_BUY' %}
+        <span class="badge badge-strong-buy">STRONG BUY</span>
+        {% elif prediction.action == 'ACCUMULATE' %}
+        <span class="badge badge-accumulate">ACCUMULATE</span>
+        {% elif prediction.action == 'HOLD' %}
+        <span class="badge badge-hold">HOLD / WAIT</span>
+        {% else %}
+        <span class="badge badge-avoid">AVOID</span>
+        {% endif %}
+      </div>
+
+      <!-- Confidence Gauge -->
+      <div style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.4rem;">
+          <span style="color: var(--text-dim);">AI Confidence Score:</span>
+          <strong style="color: var(--accent-cyan); font-family: var(--font-mono);">{{ prediction.confidence_score }}%</strong>
+        </div>
+        <div class="progress-container">
+          <div class="progress-fill" style="width: {{ prediction.confidence_score }}%;"></div>
+        </div>
+      </div>
+
+      <!-- Price Target & Stop-Loss Box -->
+      <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; font-family: var(--font-mono);">
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">ENTRY</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #fff;">₹{{ prediction.entry_price|floatformat:1 }}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">TARGET (+{{ prediction.expected_return_pct }}%)</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">₹{{ prediction.target_price|floatformat:1 }}</div>
+          </div>
+          <div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">STOP LOSS (-{{ prediction.max_risk_pct }}%)</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-rose);">₹{{ prediction.stop_loss_price|floatformat:1 }}</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-muted);">
+          <span>Risk-to-Reward: <strong style="color: var(--accent-cyan);">{{ prediction.risk_reward_ratio }}x</strong></span>
+          <span>Horizon: <strong>{{ prediction.timeframe_days }} Days</strong></span>
+        </div>
+      </div>
+
+      <!-- Live Distance Progress -->
+      <div style="background: rgba(15, 23, 42, 0.6); padding: 0.85rem; border-radius: 10px; font-size: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+          <span style="color: var(--text-muted);">Distance to Target:</span>
+          <strong id="liveTargetDist" style="color: var(--accent-green);">{{ target_dist_pct }}% away</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-muted);">Safety Buffer to Stop-Loss:</span>
+          <strong id="liveSLDist" style="color: var(--accent-rose);">{{ sl_dist_pct }}% buffer</strong>
+        </div>
+      </div>
+
+      <!-- AI Thesis Breakdown -->
+      <div>
+        <h4 style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.5rem;">
+          🧠 AI Decision Thesis & Logic
+        </h4>
+        <div style="font-size: 0.88rem; color: var(--text-main); line-height: 1.6; background: rgba(0,0,0,0.25); padding: 0.85rem; border-radius: 10px;">
+          {{ prediction.ai_thesis|linebreaksbr }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom 2-Column Section: Book Masters Checklist & Mutual Fund Overlap -->
+  <div class="grid-2">
+    
+    <!-- Left: Master Trader Book Rules Checklist -->
+    <div class="glass-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          📖 6 Trading Masters Book Rules Checklist
+        </h2>
+        <span class="badge {% if book_eval.overall_score >= 75 %}badge-strong-buy{% else %}badge-hold{% endif %}">
+          {{ book_eval.overall_score }}% Rule Compliance
+        </span>
+      </div>
+
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Market Stage: <strong style="color: var(--accent-cyan);">{{ book_eval.current_stage }}</strong>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for rule in book_eval.checklist %}
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+            <div style="font-weight: 700; font-size: 0.92rem; color: #fff;">
+              {{ rule.name }}
+            </div>
+            {% if rule.passed %}
+            <span class="badge badge-win" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;">✓ PASS</span>
+            {% else %}
+            <span class="badge badge-loss" style="font-size: 0.75rem; padding: 0.15rem 0.5rem;">✗ FAIL</span>
+            {% endif %}
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-dim); margin-bottom: 0.3rem;">
+            Master: <strong>{{ rule.master }}</strong> (<em>{{ rule.book }}</em>)
+          </div>
+          <p style="font-size: 0.83rem; color: var(--text-muted);">
+            {{ rule.note }}
+          </p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Right: Mutual Fund Smart Money Holdings -->
+    <div class="glass-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          🏦 Mutual Fund Smart Money Holdings
+        </h2>
+        <span class="badge badge-accumulate">
+          {{ smart_money.consensus_score }}% Smart Money Score
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; background: rgba(0,0,0,0.3); padding: 0.85rem; border-radius: 10px; margin-bottom: 1.25rem; font-family: var(--font-mono); font-size: 0.85rem; text-align: center;">
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-dim);">TOP FUNDS</div>
+          <div style="font-weight: 700; color: #fff;">{{ smart_money.total_funds_holding }} Funds</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-dim);">TOTAL INVESTED</div>
+          <div style="font-weight: 700; color: var(--accent-cyan);">₹{{ smart_money.total_capital_crores|floatformat:0 }} Cr</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-dim);">AVG WEIGHT</div>
+          <div style="font-weight: 700; color: var(--accent-green);">{{ smart_money.avg_weight_pct }}%</div>
+        </div>
+      </div>
+
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Signals: <strong style="color: #fff;">{{ smart_money.signal }}</strong>
+      </p>
+
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Mutual Fund Name</th>
+            <th>AMC</th>
+            <th>Weight %</th>
+            <th>Value (₹ Cr)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in smart_money.holdings_list %}
+          <tr>
+            <td style="font-weight: 600; color: #fff;">{{ h.fund.name|truncatechars:28 }}</td>
+            <td style="color: var(--text-dim); font-size: 0.8rem;">{{ h.fund.amc_name }}</td>
+            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">{{ h.weight_pct }}%</td>
+            <td style="font-family: var(--font-mono);">₹{{ h.holding_value_crores|floatformat:0 }} Cr</td>
+            <td>
+              <span class="badge {% if 'HEAVY' in h.mom_action %}badge-strong-buy{% elif 'ACCUMULATING' in h.mom_action %}badge-accumulate{% else %}badge-hold{% endif %}" style="font-size: 0.72rem;">
+                {{ h.get_mom_action_display }}
+              </span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--text-dim);">No specific fund holding recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Render Interactive Candlestick + 50/200 EMA + Volume + RSI Chart
+  const chartData = JSON.parse('{{ chart_data_json|escapejs }}');
+
+  if (chartData && chartData.dates && chartData.dates.length > 0) {
+    const traceCandlestick = {
+      type: 'candlestick',
+      x: chartData.dates,
+      open: chartData.opens,
+      high: chartData.highs,
+      low: chartData.lows,
+      close: chartData.closes,
+      name: 'Price (OHLC)',
+      increasing: { line: { color: '#10b981' } },
+      decreasing: { line: { color: '#f43f5e' } },
+      yaxis: 'y'
+    };
+
+    const traceEMA50 = {
+      type: 'scatter',
+      mode: 'lines',
+      x: chartData.dates,
+      y: chartData.ema50,
+      name: '50 EMA',
+      line: { color: '#06b6d4', width: 2 },
+      yaxis: 'y'
+    };
+
+    const traceEMA200 = {
+      type: 'scatter',
+      mode: 'lines',
+      x: chartData.dates,
+      y: chartData.ema200,
+      name: '200 EMA',
+      line: { color: '#f59e0b', width: 2 },
+      yaxis: 'y'
+    };
+
+    const traceVolume = {
+      type: 'bar',
+      x: chartData.dates,
+      y: chartData.volumes,
+      name: 'Volume',
+      marker: { color: 'rgba(59, 130, 246, 0.3)' },
+      yaxis: 'y2'
+    };
+
+    const layout = {
+      dragmode: 'zoom',
+      showlegend: true,
+      legend: { orientation: 'h', x: 0, y: 1.15, font: { color: '#94a3b8' } },
+      margin: { r: 10, t: 30, b: 40, l: 60 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      xaxis: {
+        autorange: true,
+        rangeslider: { visible: false },
+        type: 'category',
+        gridcolor: 'rgba(255,255,255,0.05)',
+        tickfont: { color: '#64748b' }
+      },
+      yaxis: {
+        autorange: true,
+        domain: [0.25, 1],
+        gridcolor: 'rgba(255,255,255,0.05)',
+        tickfont: { color: '#64748b' },
+        tickprefix: '₹'
+      },
+      yaxis2: {
+        domain: [0, 0.20],
+        showgrid: false,
+        tickfont: { color: '#64748b' }
+      }
+    };
+
+    Plotly.newPlot('stockPriceChart', [traceCandlestick, traceEMA50, traceEMA200, traceVolume], layout, { responsive: true, displayModeBar: false });
+  }
+
+  // Real-Time Live Price Streaming (Every 10 seconds)
+  const stockSymbol = '{{ stock.symbol }}';
+  let currentPriceVal = parseFloat('{{ stock.current_price }}') || 0;
+
+  async function pollLiveQuote() {
+    try {
+      const res = await fetch(`/api/live-quote/${stockSymbol}/`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.success && data.current_price) {
+        const priceEl = document.getElementById('liveStockPrice');
+        const container = document.getElementById('livePriceContainer');
+        const statusBadge = document.getElementById('liveSyncStatusBadge');
+        const targetDistEl = document.getElementById('liveTargetDist');
+        const slDistEl = document.getElementById('liveSLDist');
+
+        if (priceEl && container) {
+          const newPrice = data.current_price;
+          priceEl.textContent = `₹${newPrice.toFixed(2)}`;
+
+          // Flash micro-animation on price tick
+          if (newPrice > currentPriceVal) {
+            container.style.background = 'rgba(16, 185, 129, 0.35)';
+            setTimeout(() => { container.style.background = 'transparent'; }, 800);
+          } else if (newPrice < currentPriceVal && currentPriceVal !== 0) {
+            container.style.background = 'rgba(244, 63, 94, 0.35)';
+            setTimeout(() => { container.style.background = 'transparent'; }, 800);
+          }
+          currentPriceVal = newPrice;
+        }
+
+        if (targetDistEl && data.target_dist_pct) {
+          targetDistEl.textContent = `${data.target_dist_pct}% away`;
+        }
+        if (slDistEl && data.sl_dist_pct) {
+          slDistEl.textContent = `${data.sl_dist_pct}% buffer`;
+        }
+        if (statusBadge) {
+          statusBadge.innerHTML = `🟢 LIVE (${data.last_updated})`;
+        }
+      }
+    } catch (err) {
+      console.warn('Live quote polling error:', err);
+    }
+  }
+
+  // Poll immediately on load, then every 10 seconds
+  setInterval(pollLiveQuote, 10000);
+</script>
+{% endblock %}

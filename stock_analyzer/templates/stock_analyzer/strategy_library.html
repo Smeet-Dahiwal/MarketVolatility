@@ -1,0 +1,99 @@
+{% extends "stock_analyzer/base.html" %}
+
+{% block title %}6 Trading Masters & Strategy Rules Library • BullGuard.AI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <!-- Header -->
+  <div style="margin-bottom: 2rem;">
+    <h1 style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">
+      📖 The 6 Trading Masters & Rule Library
+    </h1>
+    <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 900px;">
+      Our AI codifies the exact rules, trend templates, and valuation formulas from 6 legendary trading classics. 
+      When trades fail, the system automatically <strong style="color: var(--accent-cyan);">re-audits these books</strong> to identify 
+      overlooked principles and save defensive filters into the database.
+    </p>
+  </div>
+
+  <!-- Active Database Safeguards & Lessons Banner -->
+  {% if active_safeguards %}
+  <div style="margin-bottom: 2.5rem; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 16px; padding: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+      <span style="font-size: 1.5rem;">🛡️</span>
+      <div>
+        <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--accent-amber);">
+          Active Pre-Trade Safeguards & Lessons Learned (Stored in DB)
+        </h2>
+        <p style="font-size: 0.82rem; color: var(--text-muted);">
+          These rules were automatically re-enforced by the AI after past failed prediction audits:
+        </p>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for guard in active_safeguards %}
+      <div style="background: rgba(0,0,0,0.3); border-left: 3px solid var(--accent-amber); padding: 0.75rem 1rem; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 0.25rem;">
+          <strong style="color: #fff;">{{ guard.prediction.stock.symbol }} • {{ guard.root_cause_category }}</strong>
+          <span style="color: var(--text-dim);">Re-Audited: {{ guard.resolved_date }}</span>
+        </div>
+        <p style="font-size: 0.85rem; color: #fde68a;">
+          {{ guard.ai_lesson_learned }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 6 Trading Masters Grid -->
+  <div class="grid-2">
+    {% for master in masters %}
+    <div class="glass-card">
+      <div class="card-header">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; text-transform: uppercase;">
+            MASTER TRADER
+          </span>
+          <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-top: 0.1rem;">
+            {{ master.name }}
+          </h2>
+        </div>
+        <span class="badge badge-accumulate" style="font-size: 0.75rem;">
+          {{ master.rules|length }} Active Rules
+        </span>
+      </div>
+
+      <div style="font-size: 0.88rem; color: var(--accent-purple); font-weight: 600; margin-bottom: 1rem;">
+        📚 Book: <em>{{ master.book }}</em>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for rule in master.rules %}
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+            <span style="font-weight: 700; font-size: 0.92rem; color: #fff;">
+              {{ rule.rule_name }}
+            </span>
+            {% if rule.is_mandatory_filter %}
+            <span class="badge badge-avoid" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;">
+              MANDATORY FILTER
+            </span>
+            {% else %}
+            <span class="badge badge-accumulate" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;">
+              SCORE WEIGHT: {{ rule.importance_weight }}x
+            </span>
+            {% endif %}
+          </div>
+          <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+            {{ rule.description }}
+          </p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

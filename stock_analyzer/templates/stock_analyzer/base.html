@@ -1,0 +1,144 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Indian Stock AI Predictor & Smart Money Engine{% endblock %}</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Plotly.js for interactive financial charts -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{% static 'stock_analyzer/css/style.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Top Benchmark & Volatility Ticker Bar -->
+  <div class="ticker-bar">
+    <div class="ticker-content">
+      <div class="index-items">
+        <div class="index-item">
+          <span class="index-name">🇮🇳 NIFTY 50:</span>
+          <span class="index-val {% if benchmarks.indices.Nifty_50.is_positive or benchmarks.indices.Nifty_50_change >= 0 %}val-up{% else %}val-down{% endif %}">
+            ₹{{ benchmarks.indices.Nifty_50.price|default:"24,850.00" }} ({{ benchmarks.indices.Nifty_50.change_pct|default:"+0.45" }}%)
+          </span>
+        </div>
+        <div class="index-item">
+          <span class="index-name">🏦 BANK NIFTY:</span>
+          <span class="index-val {% if benchmarks.indices.Bank_Nifty.is_positive or benchmarks.indices.Bank_Nifty_change >= 0 %}val-up{% else %}val-down{% endif %}">
+            ₹{{ benchmarks.indices.Bank_Nifty.price|default:"51,600.00" }} ({{ benchmarks.indices.Bank_Nifty.change_pct|default:"+0.62" }}%)
+          </span>
+        </div>
+        <div class="index-item">
+          <span class="index-name">⚡ INDIA VIX:</span>
+          <span class="index-val {% if benchmarks.indices.India_VIX.price > 18 %}val-down{% else %}val-up{% endif %}">
+            {{ benchmarks.indices.India_VIX.price|default:"13.40" }} ({{ benchmarks.indices.India_VIX.change_pct|default:"-1.8" }}%)
+          </span>
+        </div>
+      </div>
+      <div>
+        <span class="regime-badge">
+          🛡️ Regime: {{ benchmarks.market_regime|default:"Bullish & Stable (Low Volatility)" }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Navbar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="{% url 'stock_analyzer:dashboard' %}" class="brand-logo">
+        <div class="brand-icon">📈</div>
+        <div>
+          <span>BULLGUARD</span><span style="color: var(--accent-cyan);">.AI</span>
+          <div style="font-size: 0.68rem; color: var(--text-dim); font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;">
+            Indian Markets • Smart Money & Book AI
+          </div>
+        </div>
+      </a>
+
+      <!-- Quick Stock Search Bar -->
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="globalSearchInput" class="search-input" placeholder="Search NSE/BSE stock (e.g. HDFC, AXIS, RELIANCE)..." autocomplete="off">
+        <div id="searchDropdown" class="search-dropdown"></div>
+      </div>
+
+      <nav>
+        <ul class="nav-links">
+          <li>
+            <a href="{% url 'stock_analyzer:dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+              📊 Market Screener
+            </a>
+          </li>
+          <li>
+            <a href="{% url 'stock_analyzer:smart_money' %}" class="nav-link {% if request.resolver_match.url_name == 'smart_money' %}active{% endif %}">
+              🏦 Mutual Fund Smart Money
+            </a>
+          </li>
+          <li>
+            <a href="{% url 'stock_analyzer:predictions' %}" class="nav-link {% if request.resolver_match.url_name == 'predictions' %}active{% endif %}">
+              🎯 Prediction Ledger & Audit
+            </a>
+          </li>
+          <li>
+            <a href="{% url 'stock_analyzer:strategy_library' %}" class="nav-link {% if request.resolver_match.url_name == 'strategy_library' %}active{% endif %}">
+              📖 6 Book Masters
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Page Body Content -->
+  <main class="main-wrapper">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Post-Mortem Diagnostic Modal -->
+  <div id="postMortemModal" class="modal-overlay" onclick="if(event.target === this) closePostMortemModal()">
+    <div class="modal-box">
+      <button class="modal-close" onclick="closePostMortemModal()">&times;</button>
+      
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <span style="font-size: 2rem;">🔬</span>
+        <div>
+          <h2 id="modalTitle" style="font-size: 1.3rem; font-weight: 700; color: #fff;">Post-Mortem Diagnostic</h2>
+          <span id="modalCategory" class="badge badge-avoid">Sector Drag / High VIX</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1.25rem; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <h4 style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.4rem;">🔍 What Went Wrong</h4>
+        <p id="modalDiagnosis" style="font-size: 0.95rem; color: var(--text-main); line-height: 1.6;"></p>
+      </div>
+
+      <div style="margin-bottom: 1.25rem; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 12px; border: 1px solid rgba(59, 130, 246, 0.2);">
+        <h4 style="font-size: 0.85rem; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 0.4rem;">📖 Violated Book Rule Identified</h4>
+        <p id="modalRule" style="font-size: 0.92rem; font-weight: 600; color: #fff;"></p>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2);">
+        <h4 style="font-size: 0.85rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 0.4rem;">🧠 AI Lesson Learned & Active Filter</h4>
+        <p id="modalLesson" style="font-size: 0.92rem; color: #d1fae5; line-height: 1.6;"></p>
+      </div>
+
+      <div style="margin-top: 1.5rem; text-align: right;">
+        <button class="btn btn-secondary btn-sm" onclick="closePostMortemModal()">Close Diagnostic</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="{% static 'stock_analyzer/js/main.js' %}"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

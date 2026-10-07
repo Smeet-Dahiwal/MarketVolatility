@@ -1,0 +1,132 @@
+{% extends "stock_analyzer/base.html" %}
+
+{% block title %}Mutual Fund Smart Money & SIP Inflow Tracker • BullGuard.AI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <!-- Header -->
+  <div style="margin-bottom: 2rem;">
+    <h1 style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">
+      🏦 Mutual Fund Smart Money & SIP Inflow Tracker
+    </h1>
+    <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 900px;">
+      Tracking over <strong style="color: var(--accent-cyan);">₹{{ total_tracked_aum|floatformat:0 }} Crore AUM</strong> across 
+      top Indian Mutual Funds to identify institutional accumulation and consensus bluechips before retail breakout.
+    </p>
+  </div>
+
+  <!-- Top Mutual Funds Directory Grid -->
+  <h2 style="font-size: 1.3rem; font-weight: 700; color: #fff; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+    ⭐ Top Indian Asset Management Companies (AMCs)
+  </h2>
+  
+  <div class="grid-3" style="margin-bottom: 2.5rem;">
+    {% for fund in mutual_funds %}
+    <div class="glass-card">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+        <div>
+          <span style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; text-transform: uppercase;">
+            {{ fund.category }}
+          </span>
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: #fff; line-height: 1.3; margin-top: 0.2rem;">
+            {{ fund.name }}
+          </h3>
+        </div>
+        <span class="badge badge-strong-buy" style="font-size: 0.75rem;">
+          {{ fund.star_rating }} ★
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; background: rgba(0,0,0,0.3); padding: 0.75rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.85rem; margin-bottom: 0.75rem;">
+        <div>
+          <span style="font-size: 0.7rem; color: var(--text-dim); display: block;">FUND AUM</span>
+          <strong style="color: #fff;">₹{{ fund.aum_crores|floatformat:0 }} Cr</strong>
+        </div>
+        <div>
+          <span style="font-size: 0.7rem; color: var(--text-dim); display: block;">1Y RETURN</span>
+          <strong style="color: var(--accent-green);">+{{ fund.one_year_return_pct }}%</strong>
+        </div>
+        <div>
+          <span style="font-size: 0.7rem; color: var(--text-dim); display: block;">3Y RETURN</span>
+          <strong style="color: var(--accent-cyan);">+{{ fund.three_year_return_pct }}%</strong>
+        </div>
+      </div>
+
+      <div>
+        <span style="font-size: 0.78rem; color: var(--text-dim); display: block; margin-bottom: 0.3rem;">TOP HOLDINGS:</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+          {% for h in fund.holdings.all|slice:":4" %}
+          <a href="{% url 'stock_analyzer:stock_detail' h.stock.symbol %}" class="badge badge-accumulate" style="text-decoration: none; font-size: 0.75rem;">
+            {{ h.stock.symbol }} ({{ h.weight_pct }}%)
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Consensus Overlap Screener -->
+  <div class="glass-card">
+    <div class="card-header">
+      <h2 class="card-title">
+        🏆 Institutional Consensus Leaderboard (Highest MF Overlap)
+      </h2>
+    </div>
+
+    <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.25rem;">
+      When multiple ₹30,000+ Cr funds allocate high portfolio weight to the same Indian stocks, guaranteed monthly SIP inflows provide strong floor support.
+    </p>
+
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Stock Symbol</th>
+          <th>Sector</th>
+          <th>Current Price</th>
+          <th>Top Funds Holding</th>
+          <th>Avg Portfolio Weight %</th>
+          <th>Total MF Capital</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stock in top_consensus %}
+        <tr>
+          <td>
+            <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" style="font-weight: 700; color: #fff; text-decoration: none;">
+              {{ stock.symbol }}
+            </a>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ stock.name }}</div>
+          </td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ stock.sector }}</td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: #fff;">
+            ₹{{ stock.current_price|floatformat:2 }}
+          </td>
+          <td>
+            <span class="badge badge-strong-buy">
+              {{ stock.funds_count }} Funds
+            </span>
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">
+            {{ stock.avg_mf_weight|floatformat:2 }}%
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-green);">
+            ₹{{ stock.total_mf_capital|floatformat:0 }} Cr
+          </td>
+          <td>
+            <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" class="btn btn-primary btn-sm">
+              Deep Dive
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align: center; color: var(--text-dim);">No consensus data available yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

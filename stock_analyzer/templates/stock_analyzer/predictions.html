@@ -1,0 +1,232 @@
+{% extends "stock_analyzer/base.html" %}
+
+{% block title %}Prediction Ledger & Automated Post-Mortem Audit • BullGuard.AI{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+  <!-- Header & Actions -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2rem;">
+    <div>
+      <h1 style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem;">
+        🎯 Prediction Ledger & Post-Mortem Audit
+      </h1>
+      <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 850px;">
+        Transparent database record of every AI forecast. Completed trades are audited against actual NSE/BSE market prices, 
+        and failed predictions trigger automated <strong style="color: var(--accent-rose);">Post-Mortem Root-Cause Diagnostics</strong> 
+        to ensure the AI never repeats the same mistake.
+      </p>
+    </div>
+
+    <div>
+      <button id="runAuditBtn" class="btn btn-primary">
+        ⏱️ Run 4:00 PM Verification Audit Now
+      </button>
+    </div>
+  </div>
+
+  <!-- Performance Scorecard -->
+  <div class="grid-4" style="margin-bottom: 2.5rem;">
+    <div class="glass-card" style="border-left: 4px solid var(--accent-green);">
+      <div style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 0.3rem;">
+        Verified Win Rate
+      </div>
+      <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-green);">
+        {{ stats.win_rate }}%
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        🎯 {{ stats.total_wins }} Wins / {{ stats.total_losses }} Losses
+      </div>
+    </div>
+
+    <div class="glass-card" style="border-left: 4px solid var(--accent-cyan);">
+      <div style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 0.3rem;">
+        Profit Factor / Asymmetry
+      </div>
+      <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-cyan);">
+        {{ stats.profit_factor }}x
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Wins are {{ stats.profit_factor }}x larger than losses
+      </div>
+    </div>
+
+    <div class="glass-card" style="border-left: 4px solid var(--accent-purple);">
+      <div style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 0.3rem;">
+        Average Gain on Wins
+      </div>
+      <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-green);">
+        +{{ stats.avg_win }}%
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Disciplined profit target captures
+      </div>
+    </div>
+
+    <div class="glass-card" style="border-left: 4px solid var(--accent-rose);">
+      <div style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; font-weight: 600; margin-bottom: 0.3rem;">
+        Average Loss on Stop
+      </div>
+      <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-rose);">
+        {{ stats.avg_loss }}%
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        Strict downside capital protection
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Predictions Table -->
+  <div class="glass-card" style="margin-bottom: 2.5rem;">
+    <div class="card-header">
+      <h2 class="card-title">
+        ⏳ Active Trade Forecasts (In Progress)
+      </h2>
+      <span class="badge badge-accumulate">{{ active_predictions|length }} Active</span>
+    </div>
+
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Stock</th>
+          <th>Prediction Date</th>
+          <th>Action</th>
+          <th>Entry Price</th>
+          <th>Target (+%)</th>
+          <th>Stop Loss (-%)</th>
+          <th>Risk-Reward</th>
+          <th>Confidence</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pred in active_predictions %}
+        <tr>
+          <td>
+            <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" style="font-weight: 700; color: #fff; text-decoration: none;">
+              {{ pred.stock.symbol }}
+            </a>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ pred.stock.name }}</div>
+          </td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ pred.prediction_date }}</td>
+          <td>
+            {% if pred.action == 'STRONG_BUY' %}
+            <span class="badge badge-strong-buy">STRONG BUY</span>
+            {% elif pred.action == 'ACCUMULATE' %}
+            <span class="badge badge-accumulate">ACCUMULATE</span>
+            {% else %}
+            <span class="badge badge-hold">{{ pred.action }}</span>
+            {% endif %}
+          </td>
+          <td style="font-family: var(--font-mono);">₹{{ pred.entry_price|floatformat:1 }}</td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-green);">
+            ₹{{ pred.target_price|floatformat:1 }} (+{{ pred.expected_return_pct }}%)
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-rose);">
+            ₹{{ pred.stop_loss_price|floatformat:1 }} (-{{ pred.max_risk_pct }}%)
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">
+            {{ pred.risk_reward_ratio }}x
+          </td>
+          <td>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">
+              {{ pred.confidence_score }}%
+            </div>
+          </td>
+          <td>
+            <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" class="btn btn-secondary btn-sm">
+              Inspect
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align: center; color: var(--text-dim); padding: 2rem;">
+            No active predictions. Run a stock analysis to generate predictions.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Resolved Predictions & Post-Mortem Audit History -->
+  <div class="glass-card">
+    <div class="card-header">
+      <h2 class="card-title">
+        📜 Resolved Predictions & Post-Mortem Audit History
+      </h2>
+      <span class="badge badge-win">{{ resolved_predictions|length }} Resolved</span>
+    </div>
+
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Stock</th>
+          <th>Prediction Date</th>
+          <th>Outcome Status</th>
+          <th>Entry Price</th>
+          <th>Exit Price</th>
+          <th>Realized Return (P&L)</th>
+          <th>Duration</th>
+          <th>Post-Mortem Diagnostic</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pred in resolved_predictions %}
+        <tr>
+          <td>
+            <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" style="font-weight: 700; color: #fff; text-decoration: none;">
+              {{ pred.stock.symbol }}
+            </a>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">{{ pred.stock.name }}</div>
+          </td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">{{ pred.prediction_date }}</td>
+          <td>
+            {% if pred.status == 'TARGET_HIT' %}
+            <span class="badge badge-win">🎯 TARGET HIT</span>
+            {% elif pred.status == 'STOP_LOSS_HIT' %}
+            <span class="badge badge-loss">🛑 STOP LOSS HIT</span>
+            {% else %}
+            <span class="badge badge-hold">⏱️ EXPIRED</span>
+            {% endif %}
+          </td>
+          <td style="font-family: var(--font-mono);">₹{{ pred.entry_price|floatformat:1 }}</td>
+          <td style="font-family: var(--font-mono); font-weight: 700; color: #fff;">
+            ₹{{ pred.audit.exit_price|default:pred.target_price|floatformat:1 }}
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 800; {% if pred.audit.pnl_percentage >= 0 %}color: var(--accent-green);{% else %}color: var(--accent-rose);{% endif %}">
+            {% if pred.audit.pnl_percentage >= 0 %}+{% endif %}{{ pred.audit.pnl_percentage|floatformat:2 }}%
+          </td>
+          <td style="color: var(--text-muted); font-size: 0.85rem;">
+            {{ pred.audit.duration_days|default:10 }} Days
+          </td>
+          <td>
+            {% if pred.audit %}
+            <button 
+              class="btn btn-secondary btn-sm"
+              onclick="openPostMortemModal(
+                '{{ pred.stock.symbol }} - Post-Mortem Diagnostic',
+                '{{ pred.audit.root_cause_category|escapejs }}',
+                '{{ pred.audit.what_went_wrong_analysis|escapejs }}',
+                '{{ pred.audit.violated_book_rule.rule_name|default:'General Risk Protocol'|escapejs }}',
+                '{{ pred.audit.ai_lesson_learned|escapejs }}'
+              )">
+              🔬 Inspect Diagnostic
+            </button>
+            {% else %}
+            <span style="color: var(--text-dim); font-size: 0.8rem;">Auto-logged</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 2rem;">
+            No resolved predictions yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
