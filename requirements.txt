@@ -3,3 +3,5 @@ pandas==2.2.2
 yfinance==0.2.43
 ta==0.11.0
 requests==2.32.3
+django>=5.0,<5.3
+

@@ -133,11 +133,15 @@ def regime_filter_15m(df_15m) -> Tuple[bool, int, List[str]]:
     adx = _last(df_15m, "adx")
 
     if adx < CFG.adx_no_trade_below:
-        reasons.append(f"ADX {adx:.2f} < {CFG.adx_no_trade_below} (choppy/ranging) -> NO_TRADE")
+        reasons.append(
+            f"ADX {adx:.2f} < {CFG.adx_no_trade_below} (choppy/ranging) -> NO_TRADE"
+        )
         return False, 55, reasons
 
     if adx < CFG.adx_trend_strong:
-        reasons.append(f"ADX {adx:.2f} in {CFG.adx_no_trade_below}-{CFG.adx_trend_strong} (moderate trend)")
+        reasons.append(
+            f"ADX {adx:.2f} in {CFG.adx_no_trade_below}-{CFG.adx_trend_strong} (moderate trend)"
+        )
         return True, 75, reasons
 
     reasons.append(f"ADX {adx:.2f} >= {CFG.adx_trend_strong} (strong trend)")
@@ -151,12 +155,20 @@ def candle_engulfing(df) -> Tuple[int, str]:
     last = df.iloc[-1]
     prev = df.iloc[-2]
 
-    if prev["Close"] < prev["Open"] and last["Close"] > last["Open"] \
-       and last["Close"] > prev["Open"] and last["Open"] < prev["Close"]:
+    if (
+        prev["Close"] < prev["Open"]
+        and last["Close"] > last["Open"]
+        and last["Close"] > prev["Open"]
+        and last["Open"] < prev["Close"]
+    ):
         return +1, "Bullish engulfing"
 
-    if prev["Close"] > prev["Open"] and last["Close"] < last["Open"] \
-       and last["Open"] > prev["Close"] and last["Close"] < prev["Open"]:
+    if (
+        prev["Close"] > prev["Open"]
+        and last["Close"] < last["Open"]
+        and last["Open"] > prev["Close"]
+        and last["Close"] < prev["Open"]
+    ):
         return -1, "Bearish engulfing"
 
     return 0, "No engulfing"
@@ -316,14 +328,18 @@ def _breakout_trigger(df_15m, direction: str) -> Tuple[bool, List[str], float, s
     if direction == "BULL":
         level = prev_high
         if high > level and close > level:
-            reasons.append(f"Breakout above {CFG.breakout_lookback}-candle high ({level:.2f})")
+            reasons.append(
+                f"Breakout above {CFG.breakout_lookback}-candle high ({level:.2f})"
+            )
             return True, reasons, float(level), "ABOVE"
         return False, ["No bullish breakout trigger"], float(level), "ABOVE"
 
     if direction == "BEAR":
         level = prev_low
         if low < level and close < level:
-            reasons.append(f"Breakdown below {CFG.breakout_lookback}-candle low ({level:.2f})")
+            reasons.append(
+                f"Breakdown below {CFG.breakout_lookback}-candle low ({level:.2f})"
+            )
             return True, reasons, float(level), "BELOW"
         return False, ["No bearish breakout trigger"], float(level), "BELOW"
 
@@ -335,7 +351,9 @@ def detect_breakout_trend(df_15m, df_1h, cap: int) -> Optional[Dict]:
     if direction not in ("BULL", "BEAR"):
         return None
 
-    trig, trig_reasons, breakout_level, breakout_side = _breakout_trigger(df_15m, direction)
+    trig, trig_reasons, breakout_level, breakout_side = _breakout_trigger(
+        df_15m, direction
+    )
     if not trig:
         return None
 
@@ -426,7 +444,11 @@ def expected_move_projection(df_15m, confidence: int, bias: str) -> Dict:
     elif bias == "Bearish":
         direction = "down"
 
-    return {"min_points": round(min_move, 2), "max_points": round(max_move, 2), "direction": direction}
+    return {
+        "min_points": round(min_move, 2),
+        "max_points": round(max_move, 2),
+        "direction": direction,
+    }
 
 
 def _swing_low(df, lookback: int = 10) -> float:
@@ -511,7 +533,11 @@ def _top2(patterns) -> List[Dict]:
     if not patterns or not isinstance(patterns, list):
         return []
     # already sorted by patterns.py, but keep safe
-    patterns_sorted = sorted(patterns, key=lambda x: int(x.get("confidence", 0)) if isinstance(x, dict) else 0, reverse=True)
+    patterns_sorted = sorted(
+        patterns,
+        key=lambda x: int(x.get("confidence", 0)) if isinstance(x, dict) else 0,
+        reverse=True,
+    )
     return patterns_sorted[:2]
 
 
@@ -534,7 +560,11 @@ def predict_next_candle(df_15m, df_1h, df_5m=None) -> Dict:
 
     # 5m optional enrichment
     patterns_5m = []
-    if df_5m is not None and getattr(df_5m, "empty", True) is False and len(df_5m) >= 80:
+    if (
+        df_5m is not None
+        and getattr(df_5m, "empty", True) is False
+        and len(df_5m) >= 80
+    ):
         s5, line_5 = _trend_line(df_5m, "5m")
         reasons.extend([line_5, _alignment("5m", s5, "15m", s15)])
         patterns_5m = detect_patterns(df_5m, tf="5m")
@@ -573,12 +603,16 @@ def predict_next_candle(df_15m, df_1h, df_5m=None) -> Dict:
         brk["patterns"] = patterns_payload
         return brk
 
-    reasons.append("No high-quality setup detected (pullback/breakout filters not satisfied)")
+    reasons.append(
+        "No high-quality setup detected (pullback/breakout filters not satisfied)"
+    )
     return {
         "trade_type": "NO_TRADE",
         "bias": "Neutral",
         "confidence": CFG.neutral_confidence,
-        "expected_move": expected_move_projection(df_15m, CFG.neutral_confidence, "Neutral"),
+        "expected_move": expected_move_projection(
+            df_15m, CFG.neutral_confidence, "Neutral"
+        ),
         "trade": None,
         "reasons": reasons,
         "patterns": patterns_payload,

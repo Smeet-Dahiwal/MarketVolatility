@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Quick Stock Search Autocomplete
-  const searchInput = document.getElementById('globalSearchInput');
-  const searchDropdown = document.getElementById('searchDropdown');
+  // 1. Generic Stock Search Autocomplete Function
+  function setupSearch(inputId, dropdownId) {
+    const searchInput = document.getElementById(inputId);
+    const searchDropdown = document.getElementById(dropdownId);
 
-  if (searchInput && searchDropdown) {
+    if (!searchInput || !searchDropdown) return;
+
     let debounceTimer;
 
     searchInput.addEventListener('input', (e) => {
@@ -25,10 +27,10 @@ document.addEventListener('DOMContentLoaded', () => {
             searchDropdown.innerHTML = data.results.map(item => `
               <a href="/stock/${item.symbol}/" class="search-item">
                 <div>
-                  <div style="font-weight: 700; color: #fff;">${item.symbol}</div>
+                  <div style="font-weight: 700; color: #fff; font-family: var(--font-mono);">${item.symbol}</div>
                   <div style="font-size: 0.8rem; color: #94a3b8;">${item.name} • ${item.sector}</div>
                 </div>
-                <div style="font-family: var(--font-mono); font-weight: 600; color: #38bdf8;">
+                <div style="font-family: var(--font-mono); font-weight: 700; color: #38bdf8;">
                   ${item.price}
                 </div>
               </a>
@@ -40,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
           console.error('Search error:', err);
         }
-      }, 250);
+      }, 200);
     });
 
     document.addEventListener('click', (e) => {
@@ -49,6 +51,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Bind Navbar search and Hero search
+  setupSearch('globalSearchInput', 'searchDropdown');
+  setupSearch('heroSearchInput', 'heroSearchDropdown');
+
+  // Keyboard shortcut (Press '/' or 'Ctrl+K' to focus search)
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === '/' || (e.ctrlKey && e.key === 'k') || (e.metaKey && e.key === 'k')) && 
+        document.activeElement.tagName !== 'INPUT') {
+      e.preventDefault();
+      const heroInput = document.getElementById('heroSearchInput');
+      const globalInput = document.getElementById('globalSearchInput');
+      if (heroInput) {
+        heroInput.focus();
+      } else if (globalInput) {
+        globalInput.focus();
+      }
+    }
+  });
 
   // 2. Interactive Run Daily Audit Trigger
   const runAuditBtn = document.getElementById('runAuditBtn');

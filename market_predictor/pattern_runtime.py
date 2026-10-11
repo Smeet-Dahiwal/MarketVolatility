@@ -7,11 +7,15 @@ import numpy as np
 
 from market_predictor.pattern_embedding import make_embedding
 
+
 def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
     denom = (np.linalg.norm(a) * np.linalg.norm(b)) + 1e-12
     return float(np.dot(a, b) / denom)
 
-def load_rows(db_path: str, symbol: str, tf: str, trade_type: str, bias: str) -> List[Tuple]:
+
+def load_rows(
+    db_path: str, symbol: str, tf: str, trade_type: str, bias: str
+) -> List[Tuple]:
     con = sqlite3.connect(db_path)
     try:
         cur = con.execute(
@@ -25,6 +29,7 @@ def load_rows(db_path: str, symbol: str, tf: str, trade_type: str, bias: str) ->
         return cur.fetchall()
     finally:
         con.close()
+
 
 def pattern_stats(
     df_15m,
@@ -50,12 +55,22 @@ def pattern_stats(
         return {"available": False, "reason": f"DB read error: {e}"}
 
     if len(rows) < min_rows:
-        return {"available": True, "count_total": len(rows), "count_used": 0, "reason": "Not enough patterns"}
+        return {
+            "available": True,
+            "count_total": len(rows),
+            "count_used": 0,
+            "reason": "Not enough patterns",
+        }
 
     try:
         cur_emb = make_embedding(df_15m, window=embed_window)
     except Exception as e:
-        return {"available": True, "count_total": len(rows), "count_used": 0, "reason": f"Embedding error: {e}"}
+        return {
+            "available": True,
+            "count_total": len(rows),
+            "count_used": 0,
+            "reason": f"Embedding error: {e}",
+        }
 
     scored = []
     for emb_json, out_json in rows:
@@ -68,7 +83,12 @@ def pattern_stats(
             continue
 
     if not scored:
-        return {"available": True, "count_total": len(rows), "count_used": 0, "reason": "No valid rows"}
+        return {
+            "available": True,
+            "count_total": len(rows),
+            "count_used": 0,
+            "reason": "No valid rows",
+        }
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[:top_k]

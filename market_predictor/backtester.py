@@ -35,15 +35,15 @@ CSV_OUT = "backtest_results.csv"
 SYMBOL = "XAUUSD=X"
 
 # Backtest horizon
-SETUP_PERIOD = "180d"   # 15m
-TREND_PERIOD = "365d"   # 1h (more context)
-ENTRY_PERIOD = "180d"   # 5m
+SETUP_PERIOD = "180d"  # 15m
+TREND_PERIOD = "365d"  # 1h (more context)
+ENTRY_PERIOD = "180d"  # 5m
 
 # Strategy gate
 CONFIDENCE_THRESHOLD = 70
 
 # Simulation
-MAX_HOLD_5M_BARS = 72   # 72 * 5m = 6 hours max hold
+MAX_HOLD_5M_BARS = 72  # 72 * 5m = 6 hours max hold
 WORST_CASE_IF_BOTH_HIT_SAME_CANDLE = True  # conservative
 
 # Minimum rows required before evaluating
@@ -118,30 +118,43 @@ def _insert_backtest_trade(t: BTTrade) -> None:
 
 def _write_csv(trades: List[BTTrade], path: str = CSV_OUT) -> None:
     headers = [
-        "entry_time", "exit_time", "symbol", "trade_type", "bias", "confidence",
-        "entry", "stop_loss", "take_profit", "rr",
-        "outcome", "r_multiple", "bars_held_5m", "meta_json"
+        "entry_time",
+        "exit_time",
+        "symbol",
+        "trade_type",
+        "bias",
+        "confidence",
+        "entry",
+        "stop_loss",
+        "take_profit",
+        "rr",
+        "outcome",
+        "r_multiple",
+        "bars_held_5m",
+        "meta_json",
     ]
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=headers)
         w.writeheader()
         for t in trades:
-            w.writerow({
-                "entry_time": t.entry_time,
-                "exit_time": t.exit_time,
-                "symbol": t.symbol,
-                "trade_type": t.trade_type,
-                "bias": t.bias,
-                "confidence": t.confidence,
-                "entry": t.entry,
-                "stop_loss": t.stop_loss,
-                "take_profit": t.take_profit,
-                "rr": t.rr,
-                "outcome": t.outcome,
-                "r_multiple": t.r_multiple,
-                "bars_held_5m": t.bars_held_5m,
-                "meta_json": json.dumps(t.meta, ensure_ascii=False),
-            })
+            w.writerow(
+                {
+                    "entry_time": t.entry_time,
+                    "exit_time": t.exit_time,
+                    "symbol": t.symbol,
+                    "trade_type": t.trade_type,
+                    "bias": t.bias,
+                    "confidence": t.confidence,
+                    "entry": t.entry,
+                    "stop_loss": t.stop_loss,
+                    "take_profit": t.take_profit,
+                    "rr": t.rr,
+                    "outcome": t.outcome,
+                    "r_multiple": t.r_multiple,
+                    "bars_held_5m": t.bars_held_5m,
+                    "meta_json": json.dumps(t.meta, ensure_ascii=False),
+                }
+            )
 
 
 def _print_metrics(symbol: str = SYMBOL) -> None:
@@ -167,7 +180,9 @@ def _print_metrics(symbol: str = SYMBOL) -> None:
             return
 
         for trade_type, bias, n, win_rate, avg_r in rows:
-            print(f"{trade_type:14s} {bias:7s} | n={n:4d} | win={win_rate*100:5.1f}% | avgR={avg_r: .3f}")
+            print(
+                f"{trade_type:14s} {bias:7s} | n={n:4d} | win={win_rate*100:5.1f}% | avgR={avg_r: .3f}"
+            )
 
         overall = con.execute(
             """
@@ -180,7 +195,9 @@ def _print_metrics(symbol: str = SYMBOL) -> None:
             (symbol,),
         ).fetchone()
 
-        print(f"\nOVERALL | n={overall[0]} | win={overall[1]*100:.1f}% | avgR={overall[2]:.3f}")
+        print(
+            f"\nOVERALL | n={overall[0]} | win={overall[1]*100:.1f}% | avgR={overall[2]:.3f}"
+        )
 
     finally:
         con.close()
@@ -253,13 +270,20 @@ def _simulate_trade_on_5m(
             return "NO_HIT", 0.0, str(entry_ts), 0
 
     # timeout
-    return "NO_HIT", 0.0, str(df_5m_full.index[end - 1] if end - 1 >= 0 else entry_ts), max(0, end - start)
+    return (
+        "NO_HIT",
+        0.0,
+        str(df_5m_full.index[end - 1] if end - 1 >= 0 else entry_ts),
+        max(0, end - start),
+    )
 
 
 def run_backtest(symbol: str = SYMBOL) -> None:
     init_db(DB_PATH)
 
-    print(f"📥 Backtesting {symbol} | setup=15m({SETUP_PERIOD}) trend=1h({TREND_PERIOD}) entry=5m({ENTRY_PERIOD})")
+    print(
+        f"📥 Backtesting {symbol} | setup=15m({SETUP_PERIOD}) trend=1h({TREND_PERIOD}) entry=5m({ENTRY_PERIOD})"
+    )
 
     # Fetch raw data
     df_15m = fetch_data(symbol, "15m", SETUP_PERIOD, only_closed=True)

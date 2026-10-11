@@ -2,14 +2,17 @@ import json
 import sqlite3
 from typing import Any, Dict, Optional, List, Tuple
 
+
 def connect(db_path: str) -> sqlite3.Connection:
     con = sqlite3.connect(db_path)
     con.execute("PRAGMA journal_mode=WAL;")
     con.execute("PRAGMA synchronous=NORMAL;")
     return con
 
+
 def init_db(con: sqlite3.Connection) -> None:
-    con.execute("""
+    con.execute(
+        """
     CREATE TABLE IF NOT EXISTS patterns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         symbol TEXT NOT NULL,
@@ -22,10 +25,14 @@ def init_db(con: sqlite3.Connection) -> None:
         embedding_json TEXT NOT NULL,
         outcome_json TEXT NOT NULL
     );
-    """)
-    con.execute("CREATE INDEX IF NOT EXISTS idx_patterns_symbol_tf ON patterns(symbol, tf);")
+    """
+    )
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_patterns_symbol_tf ON patterns(symbol, tf);"
+    )
     con.execute("CREATE INDEX IF NOT EXISTS idx_patterns_ts ON patterns(ts);")
     con.commit()
+
 
 def insert_pattern(
     con: sqlite3.Connection,
@@ -45,9 +52,14 @@ def insert_pattern(
         VALUES(?,?,?,?,?,?,?,?,?)
         """,
         (
-            symbol, tf, ts, trade_type, bias,
-            feature_version, window,
+            symbol,
+            tf,
+            ts,
+            trade_type,
+            bias,
+            feature_version,
+            window,
             json.dumps(embedding, separators=(",", ":")),
             json.dumps(outcome, separators=(",", ":")),
-        )
+        ),
     )

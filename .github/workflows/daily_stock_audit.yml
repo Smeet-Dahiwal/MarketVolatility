@@ -1,0 +1,56 @@
+name: Automated Stock Audit & Data Sync
+
+on:
+  schedule:
+    # 10:30 UTC = 4:00 PM IST (Monday through Friday)
+    - cron: '30 10 * * 1-5'
+  workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions web tab
+
+permissions:
+  contents: write
+
+jobs:
+  run-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Database Migrations
+        run: |
+          python manage.py migrate
+
+      - name: Execute Daily 4:00 PM Verification Audit
+        run: |
+          python manage.py run_daily_audit
+
+      - name: Commit & Push Updated Database & Audit Log
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Runner"
+          git add db.sqlite3 audit_summary.json
+          git diff --staged --quiet || git commit -m "Auto: 4:00 PM EOD Stock Audit & Data Sync [skip ci]"
+          git push
+
+      - name: Upload Database Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stock-database-backup
+          path: |
+            db.sqlite3
+            audit_summary.json
+          retention-days: 14

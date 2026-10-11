@@ -2,11 +2,7 @@ import yfinance as yf
 import pandas as pd
 
 
-def weekday_volatility(
-    symbol: str,
-    start_date: str,
-    end_date: str
-):
+def weekday_volatility(symbol: str, start_date: str, end_date: str):
     """
     Returns:
     1. Daily data with weekday
@@ -14,11 +10,7 @@ def weekday_volatility(
     """
 
     df = yf.download(
-        symbol,
-        start=start_date,
-        end=end_date,
-        interval="1d",
-        progress=False
+        symbol, start=start_date, end=end_date, interval="1d", progress=False
     )
 
     if df.empty:
@@ -38,18 +30,15 @@ def weekday_volatility(
     df["Volatility"] = (df["High"] - df["Low"]).round(2)
 
     # Daily output
-    daily_data = df[
-        ["Date", "Day", "Open", "Close", "Points", "Volatility"]
-    ]
+    daily_data = df[["Date", "Day", "Open", "Close", "Points", "Volatility"]]
 
     # Summary per weekday
     summary = (
-        daily_data
-        .groupby("Day", as_index=False)
+        daily_data.groupby("Day", as_index=False)
         .agg(
             Avg_Points=("Points", "mean"),
             Avg_Volatility=("Volatility", "mean"),
-            Days_Count=("Date", "count")
+            Days_Count=("Date", "count"),
         )
         .round(2)
         .sort_values("Avg_Volatility", ascending=False)

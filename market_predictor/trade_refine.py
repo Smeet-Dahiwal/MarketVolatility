@@ -4,13 +4,15 @@ import math
 
 
 # ---------- TUNABLES ----------
-RETEST_LOOKBACK = 6          # last 6x 5m candles (~30m) for retest swing
-PULLBACK_LOOKBACK = 10       # last 10x 5m candles (~50m) for swing
-BUFFER_ATR_MULT = 0.20       # SL buffer = 0.20 * ATR (5m)
-BUFFER_PCT = 0.0010          # or 0.10% of price (whichever bigger)
+RETEST_LOOKBACK = 6  # last 6x 5m candles (~30m) for retest swing
+PULLBACK_LOOKBACK = 10  # last 10x 5m candles (~50m) for swing
+BUFFER_ATR_MULT = 0.20  # SL buffer = 0.20 * ATR (5m)
+BUFFER_PCT = 0.0010  # or 0.10% of price (whichever bigger)
 
-MAX_RISK_ATR_MULT = 1.20     # if entry->SL risk > 1.2 * ATR => reject refinement (too wide)
-MIN_RISK_ATR_MULT = 0.15     # if risk < 0.15 * ATR => bump risk (avoid too tight)
+MAX_RISK_ATR_MULT = (
+    1.20  # if entry->SL risk > 1.2 * ATR => reject refinement (too wide)
+)
+MIN_RISK_ATR_MULT = 0.15  # if risk < 0.15 * ATR => bump risk (avoid too tight)
 
 ROUND_DECIMALS = 2
 # ------------------------------
@@ -106,7 +108,10 @@ def refine_trade_levels_with_5m(
 
         # Risk sanity
         if risk > MAX_RISK_ATR_MULT * atr:
-            return None, f"SL too wide for breakout (risk {risk:.2f} > {MAX_RISK_ATR_MULT}*ATR)"
+            return (
+                None,
+                f"SL too wide for breakout (risk {risk:.2f} > {MAX_RISK_ATR_MULT}*ATR)",
+            )
         if risk < MIN_RISK_ATR_MULT * atr:
             # push SL slightly wider (avoid tiny stop-outs)
             if bias == "Bullish":

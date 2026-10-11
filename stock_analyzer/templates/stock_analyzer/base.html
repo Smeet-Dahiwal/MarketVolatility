@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Indian Stock AI Predictor & Smart Money Engine{% endblock %}</title>
+  <title>{% block title %}Indian Stock AI Predictor & Smart Money Engine • BullGuard.AI{% endblock %}</title>
   
-  <!-- Fonts -->
+  <!-- Modern Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -14,8 +14,169 @@
   <!-- Plotly.js for interactive financial charts -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
-  <!-- Custom CSS -->
-  <link rel="stylesheet" href="{% static 'stock_analyzer/css/style.css' %}">
+  <!-- External Stylesheet with Cache-Buster -->
+  <link rel="stylesheet" href="{% static 'stock_analyzer/css/style.css' %}?v=5.0">
+
+  <!-- Embedded Critical Design System (Prevents stale browser caching issues) -->
+  <style>
+    :root {
+      --bg-main: #070b12;
+      --bg-card: rgba(15, 23, 42, 0.85);
+      --bg-card-hover: rgba(22, 33, 58, 0.95);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(6, 182, 212, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    body {
+      background-color: #070b12 !important;
+      color: #f8fafc !important;
+      font-family: var(--font-sans) !important;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(30, 58, 138, 0.22) 0px, transparent 60%),
+        radial-gradient(circle at 100% 40%, rgba(139, 92, 246, 0.12) 0px, transparent 40%),
+        radial-gradient(circle at 0% 80%, rgba(6, 182, 212, 0.08) 0px, transparent 50%) !important;
+      background-attachment: fixed !important;
+    }
+
+    .ticker-bar {
+      background: rgba(10, 15, 28, 0.95);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.45rem 1.5rem;
+      font-size: 0.82rem;
+      backdrop-filter: blur(10px);
+    }
+    .ticker-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .index-items {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .index-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .index-name {
+      color: #64748b;
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .index-val { font-family: var(--font-mono); font-weight: 700; }
+    .val-up { color: #10b981 !important; }
+    .val-down { color: #f43f5e !important; }
+
+    .regime-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.2rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: rgba(16, 185, 129, 0.12);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .navbar {
+      background: rgba(10, 15, 28, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      padding: 0.85rem 1.5rem;
+    }
+    .nav-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.5rem;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 1.3rem;
+      letter-spacing: -0.02em;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .nav-link {
+      text-decoration: none;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .nav-link:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .nav-link.active {
+      color: #06b6d4;
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+    }
+
+    .main-wrapper {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+  </style>
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -26,13 +187,13 @@
       <div class="index-items">
         <div class="index-item">
           <span class="index-name">🇮🇳 NIFTY 50:</span>
-          <span class="index-val {% if benchmarks.indices.Nifty_50.is_positive or benchmarks.indices.Nifty_50_change >= 0 %}val-up{% else %}val-down{% endif %}">
+          <span class="index-val {% if benchmarks.indices.Nifty_50.is_positive or benchmarks.indices.Nifty_50.change_pct >= 0 %}val-up{% else %}val-down{% endif %}">
             ₹{{ benchmarks.indices.Nifty_50.price|default:"24,850.00" }} ({{ benchmarks.indices.Nifty_50.change_pct|default:"+0.45" }}%)
           </span>
         </div>
         <div class="index-item">
           <span class="index-name">🏦 BANK NIFTY:</span>
-          <span class="index-val {% if benchmarks.indices.Bank_Nifty.is_positive or benchmarks.indices.Bank_Nifty_change >= 0 %}val-up{% else %}val-down{% endif %}">
+          <span class="index-val {% if benchmarks.indices.Bank_Nifty.is_positive or benchmarks.indices.Bank_Nifty.change_pct >= 0 %}val-up{% else %}val-down{% endif %}">
             ₹{{ benchmarks.indices.Bank_Nifty.price|default:"51,600.00" }} ({{ benchmarks.indices.Bank_Nifty.change_pct|default:"+0.62" }}%)
           </span>
         </div>
@@ -64,10 +225,10 @@
         </div>
       </a>
 
-      <!-- Quick Stock Search Bar -->
-      <div class="search-wrapper">
+      <!-- Quick Stock Search Bar (Shown on Subpages, Hidden on Homepage where Hero Search is active) -->
+      <div class="search-wrapper" {% if request.resolver_match.url_name == 'dashboard' %}style="display: none;"{% endif %}>
         <span class="search-icon">🔍</span>
-        <input type="text" id="globalSearchInput" class="search-input" placeholder="Search NSE/BSE stock (e.g. HDFC, AXIS, RELIANCE)..." autocomplete="off">
+        <input type="text" id="globalSearchInput" class="search-input" placeholder="Search NSE/BSE stock (e.g. HDFC)..." autocomplete="off">
         <div id="searchDropdown" class="search-dropdown"></div>
       </div>
 
@@ -138,7 +299,7 @@
   </div>
 
   <!-- Main JavaScript -->
-  <script src="{% static 'stock_analyzer/js/main.js' %}"></script>
+  <script src="{% static 'stock_analyzer/js/main.js' %}?v=5.0"></script>
   {% block extra_js %}{% endblock %}
 </body>
 </html>

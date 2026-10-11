@@ -7,8 +7,13 @@ def print_daywise(daily_df):
 
     # Ensure proper order of days
     day_order = [
-        "Monday", "Tuesday", "Wednesday",
-        "Thursday", "Friday", "Saturday", "Sunday"
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
     ]
 
     for day in day_order:
@@ -19,9 +24,9 @@ def print_daywise(daily_df):
 
         print(f"\n🟦 {day}")
         print(
-            day_df[[
-                "Date", "Open", "Close", "Points", "Volatility"
-            ]].to_string(index=False)
+            day_df[["Date", "Open", "Close", "Points", "Volatility"]].to_string(
+                index=False
+            )
         )
 
 
@@ -36,9 +41,7 @@ def print_summary(summary_df):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Market weekday volatility analysis"
-    )
+    parser = argparse.ArgumentParser(description="Market weekday volatility analysis")
 
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--start", required=True)
@@ -47,9 +50,7 @@ def main():
     args = parser.parse_args()
 
     daily, summary = weekday_volatility(
-        symbol=args.symbol,
-        start_date=args.start,
-        end_date=args.end
+        symbol=args.symbol, start_date=args.start, end_date=args.end
     )
 
     print_daywise(daily)

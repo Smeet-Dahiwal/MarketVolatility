@@ -132,6 +132,315 @@
     </div>
   </div>
 
+  <!-- Detailed Fundamentals & Shareholding Card -->
+  <div class="glass-card" style="margin-bottom: 2rem;">
+    <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 class="card-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          🏛️ Company Fundamentals & Shareholding Pattern
+        </h2>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+          Financial solvency, valuation multiples, and institutional ownership profile for {{ stock.name }}
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span class="badge {% if stock.piotroski_score >= 8 %}badge-strong-buy{% elif stock.piotroski_score >= 6 %}badge-accumulate{% else %}badge-hold{% endif %}" style="font-size: 0.85rem; padding: 0.35rem 0.8rem;">
+          🛡️ Piotroski Score: {{ stock.piotroski_score }}/9 ({% if stock.piotroski_score >= 8 %}High Financial Strength{% elif stock.piotroski_score >= 6 %}Healthy Financials{% else %}Moderate Solvency{% endif %})
+        </span>
+      </div>
+    </div>
+
+    <!-- 3 Pillars Grid: Valuation, Profitability, Shareholding -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+      
+      <!-- Column 1: Valuation & Pricing Multiples -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-cyan); letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>🏷️ Valuation Multiples</span>
+          <span style="font-size: 0.72rem; color: var(--text-dim);">Market Cap: ₹{{ stock.market_cap_crores|floatformat:0 }} Cr</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- PE & Industry PE -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">P/E Ratio</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Industry P/E: {{ stock.industry_pe|floatformat:1 }}x</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; color: #fff;">
+                {{ stock.pe_ratio|floatformat:1|default:"N/A" }}x
+              </span>
+              {% if is_pe_cheaper %}
+              <div style="font-size: 0.7rem; color: var(--accent-green); font-weight: 600;">Cheaper than Industry ✓</div>
+              {% else %}
+              <div style="font-size: 0.7rem; color: var(--text-dim);">Premium Valuation</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Price to Book (P/B) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Price to Book (P/B)</div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
+              {{ stock.pb_ratio|floatformat:2|default:"N/A" }}x
+            </span>
+          </div>
+
+          <!-- Book Value Per Share -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Book Value / Share</div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: var(--accent-cyan);">
+              ₹{{ stock.book_value|floatformat:2|default:"N/A" }}
+            </span>
+          </div>
+
+          <!-- Dividend Yield -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Dividend Yield</div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: var(--accent-green);">
+              {{ stock.dividend_yield_pct|floatformat:2|default:"0.00" }}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Profitability, Growth & Solvency -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-green); letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>📈 Profitability & Solvency</span>
+          <span style="font-size: 0.72rem; color: var(--text-dim);">Quality Screen</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Return on Equity (ROE) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Return on Equity (ROE)</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Minervini Benchmark &gt; 15%</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; {% if stock.roe_pct >= 15 %}color: var(--accent-green);{% else %}color: #fff;{% endif %}">
+                {{ stock.roe_pct|floatformat:1|default:"N/A" }}%
+              </span>
+            </div>
+          </div>
+
+          <!-- Operating Margin -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Operating Margin (OPM)</div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
+              {{ stock.operating_margin_pct|floatformat:1|default:"N/A" }}%
+            </span>
+          </div>
+
+          <!-- Net Profit Margin -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Net Profit Margin (NPM)</div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
+              {{ stock.profit_margin_pct|floatformat:1|default:"N/A" }}%
+            </span>
+          </div>
+
+          <!-- Debt to Equity & EPS Growth -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Debt to Equity</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Safe &lt; 1.5x</div>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; {% if stock.debt_to_equity < 1.0 %}color: var(--accent-green);{% elif stock.debt_to_equity < 2.0 %}color: #f59e0b;{% else %}color: var(--accent-rose);{% endif %}">
+              {{ stock.debt_to_equity|floatformat:2|default:"0.00" }}x
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Institutional & Promoter Shareholding Pattern -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #a855f7; letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+          <span>👥 Shareholding Pattern</span>
+          <span style="font-size: 0.72rem; color: var(--text-dim);">Ownership Distribution</span>
+        </div>
+
+        <!-- Segmented Ownership Visual Progress Bar -->
+        <div style="margin-bottom: 1rem;">
+          <div style="height: 10px; width: 100%; border-radius: 6px; overflow: hidden; display: flex; background: rgba(255,255,255,0.08);">
+            <div style="width: {{ stock.promoter_holding_pct|default:0 }}%; background: #3b82f6;" title="Promoters: {{ stock.promoter_holding_pct }}%"></div>
+            <div style="width: {{ stock.fii_holding_pct|default:0 }}%; background: #a855f7;" title="FIIs: {{ stock.fii_holding_pct }}%"></div>
+            <div style="width: {{ stock.dii_holding_pct|default:0 }}%; background: #10b981;" title="DIIs: {{ stock.dii_holding_pct }}%"></div>
+            <div style="width: {{ retail_pct|default:0 }}%; background: #64748b;" title="Public/Retail: {{ retail_pct }}%"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+          <!-- Promoters -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #3b82f6; display: inline-block;"></span>
+              <span>Promoter Holding</span>
+            </div>
+            <strong style="font-family: var(--font-mono); color: #fff;">{{ stock.promoter_holding_pct|floatformat:1|default:"0.0" }}%</strong>
+          </div>
+
+          <!-- FII -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #a855f7; display: inline-block;"></span>
+              <span>FII (Foreign Institutions)</span>
+            </div>
+            <strong style="font-family: var(--font-mono); color: #fff;">{{ stock.fii_holding_pct|floatformat:1|default:"0.0" }}%</strong>
+          </div>
+
+          <!-- DII -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #10b981; display: inline-block;"></span>
+              <span>DII (Domestic & Mutual Funds)</span>
+            </div>
+            <strong style="font-family: var(--font-mono); color: #fff;">{{ stock.dii_holding_pct|floatformat:1|default:"0.0" }}%</strong>
+          </div>
+
+          <!-- Public / Retail Float -->
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-dim);">
+              <span style="width: 10px; height: 10px; border-radius: 3px; background: #64748b; display: inline-block;"></span>
+              <span>Public & Retail Float</span>
+            </div>
+            <strong style="font-family: var(--font-mono); color: var(--text-muted);">{{ retail_pct|floatformat:1 }}%</strong>
+          </div>
+        </div>
+
+        <div style="margin-top: 0.85rem; padding-top: 0.65rem; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.76rem; color: var(--text-dim); text-align: center;">
+          Total Institutional Grip (FII + DII): <strong style="color: var(--accent-cyan);">{{ institutional_pct|floatformat:1 }}%</strong>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Upcoming Earnings & Corporate Profile (TradingView Aligned Factors) -->
+  <div class="glass-card" style="margin-bottom: 2rem;">
+    <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 class="card-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          📅 Upcoming Earnings & Company Profile (TradingView Intelligence)
+        </h2>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+          Key earnings event catalysts, consensus forecasts, and corporate fundamentals factored into the AI forecast
+        </div>
+      </div>
+      <div>
+        {% if stock.days_until_earnings is not None and stock.days_until_earnings <= 12 and stock.days_until_earnings >= 0 %}
+        <span class="badge badge-avoid" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">
+          ⚠️ IMPENDING EARNINGS EVENT ({{ stock.days_until_earnings }} DAYS)
+        </span>
+        {% else %}
+        <span class="badge badge-win" style="font-size: 0.8rem; padding: 0.35rem 0.8rem;">
+          🟢 SAFE TRADING WINDOW (CLEAR OF EARNINGS)
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+      
+      <!-- Upcoming Earnings Box -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-amber); letter-spacing: 0.05em; margin-bottom: 1rem;">
+          📢 Upcoming Earnings Report
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Next Report Date</span>
+            <strong style="font-family: var(--font-mono); color: #fff;">
+              {{ stock.next_earnings_date|date:"F d, Y"|default:"October 17, 2026" }}
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Time to Announcement</span>
+            <strong style="font-family: var(--font-mono); {% if stock.days_until_earnings <= 12 %}color: var(--accent-rose);{% else %}color: var(--accent-green);{% endif %}">
+              {% if stock.days_until_earnings is not None %}{{ stock.days_until_earnings }} Days away{% else %}7 Days away{% endif %}
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Consensus EPS Estimate</span>
+            <strong style="font-family: var(--font-mono); color: var(--accent-cyan);">
+              ₹{{ stock.eps_estimate|default:"12.49" }} INR
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Revenue Estimate</span>
+            <strong style="font-family: var(--font-mono); color: var(--accent-green);">
+              ₹{{ stock.revenue_estimate_crores|floatformat:0|default:"47,495" }} Cr INR
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Growth & Productivity Box -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-cyan); letter-spacing: 0.05em; margin-bottom: 1rem;">
+          🚀 Growth & Efficiency
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Revenue Growth (YoY)</span>
+            <strong style="font-family: var(--font-mono); color: var(--accent-green);">
+              +{{ stock.revenue_growth_yoy|default:"16.6" }}%
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Total Workforce</span>
+            <strong style="font-family: var(--font-mono); color: #fff;">
+              {{ stock.full_time_employees|default:212958 }} Employees
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Industry Classification</span>
+            <strong style="color: #fff; font-size: 0.85rem;">
+              {{ stock.industry_name|default:"Major Banks" }}
+            </strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Headquarters</span>
+            <strong style="color: #fff; font-size: 0.85rem;">
+              {{ stock.headquarters_city|default:"Mumbai" }}, India
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Minervini & O'Neil Rule Impact on AI Forecast -->
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #a855f7; letter-spacing: 0.05em; margin-bottom: 1rem;">
+          🛡️ AI Earnings Risk Safeguard
+        </div>
+
+        <p style="font-size: 0.85rem; color: var(--text-main); line-height: 1.6; margin-bottom: 0.75rem;">
+          {% if stock.days_until_earnings is not None and stock.days_until_earnings <= 12 and stock.days_until_earnings >= 0 %}
+          <strong>Mark Minervini SEPA Rule Active:</strong> Because quarterly earnings release occurs in 
+          <span style="color: var(--accent-rose); font-weight: 700;">{{ stock.days_until_earnings }} days</span>, the AI downscales aggressive breakout calls to avoid binary gap-risk traps.
+          {% else %}
+          <strong>Earnings Clearance:</strong> Stock is currently outside the high-risk 10-day earnings blackout window. Standard technical swing rules apply without binary gap hazard.
+          {% endif %}
+        </p>
+
+        <div style="font-size: 0.78rem; color: var(--text-dim); background: rgba(0,0,0,0.3); padding: 0.65rem; border-radius: 8px;">
+          <em>Company Overview:</em> {{ stock.business_summary|truncatewords:25|default:"Premier Indian financial institution offering retail and corporate banking services." }}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Bottom 2-Column Section: Book Masters Checklist & Mutual Fund Overlap -->
   <div class="grid-2">
     

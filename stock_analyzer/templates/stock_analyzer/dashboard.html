@@ -2,11 +2,308 @@
 
 {% block title %}BullGuard.AI • Indian Stock Market Intelligence & AI Predictor{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* CRITICAL DASHBOARD STYLES (Guarantees zero unstyled flicker) */
+  .hero-clean {
+    text-align: center;
+    padding: 3.5rem 1rem 2.25rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .hero-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1.1rem;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(6, 182, 212, 0.08);
+    color: #38bdf8;
+    border: 1px solid rgba(6, 182, 212, 0.25);
+    margin-bottom: 1.25rem;
+  }
+  .hero-title {
+    font-size: clamp(2.1rem, 4.5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    color: #ffffff;
+    background: linear-gradient(180deg, #ffffff 40%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero-desc {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero-search-box {
+    position: relative;
+    max-width: 640px;
+    margin: 0 auto 1.25rem;
+    width: 100%;
+  }
+  .hero-search-input {
+    width: 100%;
+    padding: 1.1rem 5.5rem 1.1rem 3.25rem;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 16px;
+    color: #fff;
+    font-size: 1.05rem;
+    font-family: inherit;
+    outline: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .hero-search-input:focus {
+    border-color: #06b6d4;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 25px rgba(6, 182, 212, 0.25);
+    background: rgba(15, 23, 42, 0.98);
+  }
+  .hero-search-icon {
+    position: absolute;
+    left: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.25rem;
+    color: #64748b;
+    pointer-events: none;
+  }
+  .hero-search-shortcut {
+    position: absolute;
+    right: 1.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-family: monospace;
+    pointer-events: none;
+  }
+  .quick-trending-tags {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .trending-tag {
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.2s ease;
+    font-family: monospace;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .trending-tag:hover {
+    color: #fff;
+    background: rgba(6, 182, 212, 0.12);
+    border-color: rgba(6, 182, 212, 0.35);
+    transform: translateY(-1px);
+  }
+  .market-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2.75rem;
+  }
+  .strip-item {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.1rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.2s ease;
+  }
+  .strip-item:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  .strip-label {
+    color: #64748b;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .strip-val {
+    font-family: monospace;
+    font-weight: 800;
+    font-size: 1.35rem;
+    color: #fff;
+  }
+  .tab-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 0.35rem;
+    border-radius: 14px;
+    max-width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 0.6rem 1.4rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tab-btn:hover { color: #fff; }
+  .tab-btn.active {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(6, 182, 212, 0.25));
+    color: #fff;
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    box-shadow: 0 4px 14px rgba(6, 182, 212, 0.15);
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+  }
+  .stock-card {
+    background: linear-gradient(160deg, rgba(17, 24, 39, 0.85), rgba(15, 23, 42, 0.75));
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 1.4rem;
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  }
+  .stock-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(6, 182, 212, 0.35);
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.65), 0 0 25px rgba(6, 182, 212, 0.12);
+  }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.6rem;
+  }
+  .stock-symbol {
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-family: monospace;
+    color: #fff;
+  }
+  .stock-name {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px;
+    margin-top: 0.15rem;
+  }
+  .stock-price-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .stock-price-lg {
+    font-size: 1.75rem;
+    font-weight: 800;
+    font-family: monospace;
+    color: #fff;
+  }
+  .mini-pills {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 0.85rem;
+    border-radius: 12px;
+    margin-bottom: 1.15rem;
+    font-size: 0.82rem;
+  }
+  .mini-pill-item { display: flex; flex-direction: column; }
+  .mini-pill-label {
+    font-size: 0.68rem;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .mini-pill-val {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .trust-strip {
+    margin-top: 4rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 2.5rem;
+  }
+  .trust-box {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 1.35rem;
+  }
+  .trust-icon { font-size: 1.75rem; margin-bottom: 0.5rem; }
+  .trust-title { font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 0.35rem; }
+  .trust-desc { font-size: 0.88rem; color: #94a3b8; line-height: 1.5; }
+
+  @media (max-width: 1024px) {
+    .market-strip { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 768px) {
+    .market-strip { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .trust-strip { grid-template-columns: 1fr; }
+    .hero-title { font-size: 2rem; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- CLEAN HERO SECTION -->
 <section class="hero-clean">
   <div class="hero-pill">
-    <span>✨</span> AI Market Intelligence • NSE & BSE Stocks
+    <span>✦</span> AI Market Intelligence • NSE & BSE Stocks
   </div>
 
   <h1 class="hero-title">
@@ -14,7 +311,7 @@
   </h1>
 
   <p class="hero-desc">
-    We track where <strong style="color: var(--accent-cyan);">₹2.8 Lakh Crore of Mutual Fund SIPs</strong> are flowing, 
+    Track where <strong style="color: var(--accent-cyan);">₹2.8 Lakh Crore of Mutual Fund SIPs</strong> are flowing, 
     filter setups using <strong style="color: var(--accent-purple);">6 legendary trading classics</strong>, and self-audit predictions daily.
   </p>
 
@@ -25,18 +322,19 @@
       type="text" 
       id="heroSearchInput" 
       class="hero-search-input" 
-      placeholder="Search any Indian stock (e.g. HDFC, Axis, Reliance, ICICI, L&T)..." 
+      placeholder="Search any Indian stock (e.g. HDFC, Reliance, ICICI, TCS, L&T)..." 
       autocomplete="off"
     >
+    <span class="hero-search-shortcut">Press /</span>
     <div id="heroSearchDropdown" class="search-dropdown"></div>
   </div>
 
   <!-- Quick Trending Chips -->
   <div class="quick-trending-tags">
-    <span style="font-size: 0.8rem; color: var(--text-dim); margin-right: 0.25rem;">Popular:</span>
+    <span style="font-size: 0.8rem; color: var(--text-dim); margin-right: 0.35rem; font-weight: 600;">Popular Scans:</span>
     {% for s in popular_stocks|slice:":6" %}
     <a href="{% url 'stock_analyzer:stock_detail' s.symbol %}" class="trending-tag">
-      {{ s.symbol|cut:".NS" }} <span style="color: var(--accent-cyan);">₹{{ s.current_price|floatformat:1 }}</span>
+      {{ s.symbol|cut:".NS" }} <span style="color: var(--accent-cyan); font-weight: 700;">₹{{ s.current_price|floatformat:1 }}</span>
     </a>
     {% endfor %}
   </div>
@@ -46,26 +344,34 @@
 <div class="market-strip">
   <div class="strip-item">
     <span class="strip-label">🇮🇳 Nifty 50</span>
-    <span class="strip-val">₹{{ benchmarks.indices.Nifty_50.price|floatformat:1|default:"24,850.0" }}</span>
-    <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-green);">({{ benchmarks.indices.Nifty_50.change_pct|default:"+0.45" }}%)</span>
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <span class="strip-val">₹{{ benchmarks.indices.Nifty_50.price|floatformat:1|default:"24,850.0" }}</span>
+      <span style="font-size: 0.82rem; font-weight: 700; color: var(--accent-green);">({{ benchmarks.indices.Nifty_50.change_pct|default:"+0.45" }}%)</span>
+    </div>
   </div>
 
   <div class="strip-item">
     <span class="strip-label">🏦 Bank Nifty</span>
-    <span class="strip-val">₹{{ benchmarks.indices.Bank_Nifty.price|floatformat:1|default:"51,600.0" }}</span>
-    <span style="font-size: 0.78rem; font-weight: 700; color: var(--accent-green);">({{ benchmarks.indices.Bank_Nifty.change_pct|default:"+0.62" }}%)</span>
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <span class="strip-val">₹{{ benchmarks.indices.Bank_Nifty.price|floatformat:1|default:"51,600.0" }}</span>
+      <span style="font-size: 0.82rem; font-weight: 700; color: var(--accent-green);">({{ benchmarks.indices.Bank_Nifty.change_pct|default:"+0.62" }}%)</span>
+    </div>
   </div>
 
   <div class="strip-item">
     <span class="strip-label">⚡ India VIX</span>
-    <span class="strip-val">{{ benchmarks.indices.India_VIX.price|floatformat:1|default:"13.4" }}</span>
-    <span class="badge badge-win" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;">Calm / Low Risk</span>
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <span class="strip-val">{{ benchmarks.indices.India_VIX.price|floatformat:1|default:"13.4" }}</span>
+      <span class="badge badge-win" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;">Calm / Low Risk</span>
+    </div>
   </div>
 
   <div class="strip-item">
     <span class="strip-label">🎯 AI Accuracy</span>
-    <span class="strip-val" style="color: var(--accent-green);">{{ stats.win_rate }}%</span>
-    <span style="font-size: 0.78rem; color: var(--text-dim);">({{ stats.total_wins }}W / {{ stats.total_losses }}L)</span>
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <span class="strip-val" style="color: var(--accent-green);">{{ stats.win_rate }}%</span>
+      <span style="font-size: 0.78rem; color: var(--text-dim);">({{ stats.total_wins }}W / {{ stats.total_losses }}L)</span>
+    </div>
   </div>
 </div>
 
@@ -104,8 +410,8 @@
 
         <div class="stock-price-row">
           <div class="stock-price-lg">₹{{ pred.stock.current_price|floatformat:2 }}</div>
-          <div style="font-size: 0.8rem; color: var(--text-dim);">
-            Confidence: <strong style="color: var(--accent-cyan);">{{ pred.confidence_score }}%</strong>
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); padding: 0.2rem 0.55rem; border-radius: 6px;">
+            {{ pred.confidence_score }}% Confidence
           </div>
         </div>
 
@@ -122,16 +428,16 @@
               ₹{{ pred.stop_loss_price|floatformat:1 }} (-{{ pred.max_risk_pct }}%)
             </span>
           </div>
-          <div class="mini-pill-item" style="grid-column: span 2; margin-top: 0.2rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.35rem;">
+          <div class="mini-pill-item" style="grid-column: span 2; margin-top: 0.25rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.45rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.78rem;">
-              <span style="color: var(--text-dim);">Risk-to-Reward: <strong style="color: var(--accent-cyan);">{{ pred.risk_reward_ratio }}x</strong></span>
+              <span style="color: var(--text-dim);">Risk-Reward: <strong style="color: var(--accent-cyan);">{{ pred.risk_reward_ratio }}x</strong></span>
               <span style="color: var(--text-dim);">Horizon: <strong style="color: #fff;">{{ pred.timeframe_days }} Days</strong></span>
             </div>
           </div>
         </div>
       </div>
 
-      <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600;">
+      <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem;">
         View Deep Dive Analysis →
       </a>
     </div>
@@ -161,7 +467,7 @@
 
         <div class="stock-price-row">
           <div class="stock-price-lg">₹{{ stock.current_price|floatformat:2 }}</div>
-          <div style="font-size: 0.8rem; color: var(--accent-cyan); font-weight: 700;">
+          <div style="font-size: 0.8rem; color: var(--accent-cyan); font-weight: 700; background: rgba(6, 182, 212, 0.1); padding: 0.2rem 0.55rem; border-radius: 6px;">
             {{ stock.avg_mf_weight|floatformat:1 }}% Avg Weight
           </div>
         </div>
@@ -175,14 +481,14 @@
           </div>
           <div class="mini-pill-item">
             <span class="mini-pill-label">SECTOR</span>
-            <span class="mini-pill-val" style="color: #fff; font-size: 0.75rem;">
+            <span class="mini-pill-val" style="color: #fff; font-size: 0.8rem;">
               {{ stock.sector|truncatechars:18 }}
             </span>
           </div>
         </div>
       </div>
 
-      <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600;">
+      <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem;">
         Inspect Fund Overlap →
       </a>
     </div>
@@ -208,7 +514,7 @@
 
         <div class="stock-price-row">
           <div class="stock-price-lg">₹{{ stock.current_price|floatformat:2 }}</div>
-          <div style="font-size: 0.78rem; color: var(--text-dim);">
+          <div style="font-size: 0.78rem; color: var(--text-dim); font-weight: 600;">
             NSE Bluechip
           </div>
         </div>
@@ -229,7 +535,7 @@
         </div>
       </div>
 
-      <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600;">
+      <a href="{% url 'stock_analyzer:stock_detail' stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem;">
         Analyze Technicals →
       </a>
     </div>
@@ -243,23 +549,23 @@
     <div class="trust-icon">🏦</div>
     <h3 class="trust-title">1. Follow The SIP Tide</h3>
     <p class="trust-desc">
-      Every month, Indian retail investors pump ₹25,000+ Cr into SIPs. We track the high-conviction stocks where top AMCs concentrate their buying.
+      Every month, Indian retail investors pump ₹25,000+ Cr into SIPs. We track high-conviction stocks where top AMCs concentrate their buying power.
     </p>
   </div>
 
   <div class="trust-box">
     <div class="trust-icon">📖</div>
-    <h3 class="trust-title">2. 6 Master Trading Books</h3>
+    <h3 class="trust-title">2. 6 Master Rules Filter</h3>
     <p class="trust-desc">
-      Setups must pass quantitative trend and valuation filters from Mark Minervini (SEPA), William O'Neil (CAN SLIM), Stan Weinstein, and Benjamin Graham.
+      Setups must pass strict mathematical filters from Minervini (SEPA), O'Neil (CAN SLIM), Stan Weinstein (Stage 2), and Graham (Margin of Safety).
     </p>
   </div>
 
   <div class="trust-box">
-    <div class="trust-icon">🎯</div>
+    <div class="trust-icon">🛡️</div>
     <h3 class="trust-title">3. Daily 4:00 PM Verification</h3>
     <p class="trust-desc">
-      All forecasts are audited against actual NSE prices daily. When a stop-loss is hit, the AI diagnoses the root cause and tightens future filters.
+      Every market close, AI audits all predictions. When a prediction hits a stop loss, it conducts an automated post-mortem to prevent future repeating traps.
     </p>
   </div>
 </div>
@@ -267,62 +573,13 @@
 
 {% block extra_js %}
 <script>
-  // Tab Switching Logic
-  function switchDashboardTab(tabId, btn) {
+  function switchDashboardTab(tabId, btnEl) {
     document.querySelectorAll('.dashboard-tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-
-    const activeTab = document.getElementById('tab-' + tabId);
-    if (activeTab) activeTab.style.display = 'block';
-    if (btn) btn.classList.add('active');
-  }
-
-  // Hero Search Autocomplete
-  const heroSearchInput = document.getElementById('heroSearchInput');
-  const heroDropdown = document.getElementById('heroSearchDropdown');
-
-  if (heroSearchInput && heroDropdown) {
-    let timer;
-    heroSearchInput.addEventListener('input', (e) => {
-      clearTimeout(timer);
-      const q = e.target.value.trim();
-      if (q.length < 1) {
-        heroDropdown.classList.remove('active');
-        heroDropdown.innerHTML = '';
-        return;
-      }
-
-      timer = setTimeout(async () => {
-        try {
-          const res = await fetch(`/api/search/?q=${encodeURIComponent(q)}`);
-          const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            heroDropdown.innerHTML = data.results.map(item => `
-              <a href="/stock/${item.symbol}/" class="search-item">
-                <div>
-                  <div style="font-weight: 700; color: #fff;">${item.symbol}</div>
-                  <div style="font-size: 0.8rem; color: #94a3b8;">${item.name} • ${item.sector}</div>
-                </div>
-                <div style="font-family: var(--font-mono); font-weight: 600; color: #38bdf8;">
-                  ${item.price}
-                </div>
-              </a>
-            `).join('');
-            heroDropdown.classList.add('active');
-          } else {
-            heroDropdown.classList.remove('active');
-          }
-        } catch (err) {
-          console.error(err);
-        }
-      }, 200);
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!heroSearchInput.contains(e.target) && !heroDropdown.contains(e.target)) {
-        heroDropdown.classList.remove('active');
-      }
-    });
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    
+    const target = document.getElementById('tab-' + tabId);
+    if (target) target.style.display = 'block';
+    if (btnEl) btnEl.classList.add('active');
   }
 </script>
 {% endblock %}

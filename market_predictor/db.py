@@ -61,8 +61,12 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol_ts ON signals(symbol, ts);")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_signals_fp ON signals(fingerprint);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_symbol_ts ON signals(symbol, ts);"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_signals_fp ON signals(fingerprint);"
+        )
 
         # ---- Migration: add patterns_json to signals (if missing) ----
         cols = _table_columns(con, "signals")
@@ -89,7 +93,9 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol_ts ON trades(symbol, ts);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_trades_symbol_ts ON trades(symbol, ts);"
+        )
         con.execute("CREATE INDEX IF NOT EXISTS idx_trades_fp ON trades(fingerprint);")
 
         # Alerts
@@ -107,8 +113,12 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_alerts_symbol_ts ON alerts(symbol, ts);")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_alerts_kind_fp ON alerts(kind, fingerprint);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alerts_symbol_ts ON alerts(symbol, ts);"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alerts_kind_fp ON alerts(kind, fingerprint);"
+        )
 
         # Backtest trades
         con.execute(
@@ -129,8 +139,12 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_bt_symbol_ts ON backtest_trades(symbol, ts);")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_bt_type_bias ON backtest_trades(trade_type, bias);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bt_symbol_ts ON backtest_trades(symbol, ts);"
+        )
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_bt_type_bias ON backtest_trades(trade_type, bias);"
+        )
 
         # Phase-2 reserved tables
         con.execute(
@@ -147,7 +161,9 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_patterns_key ON patterns(symbol, tf, trade_type, bias);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_patterns_key ON patterns(symbol, tf, trade_type, bias);"
+        )
 
         con.execute(
             """
@@ -164,7 +180,9 @@ def init_db(db_path: str = DB_PATH_DEFAULT) -> None:
             );
             """
         )
-        con.execute("CREATE INDEX IF NOT EXISTS idx_calib_key ON calibration(symbol, trade_type, bias);")
+        con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_calib_key ON calibration(symbol, trade_type, bias);"
+        )
 
         con.commit()
     finally:

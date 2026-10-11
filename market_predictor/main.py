@@ -69,12 +69,23 @@ def _snap_indicators(df, tf: str) -> list[str]:
 
 def _indicators_dict(df_1h, df_15m, df_5m=None) -> dict:
     """Store key indicator values (numbers) into DB for analysis."""
+
     def last_vals(df):
         if df is None or df.empty:
             return {}
         row = df.iloc[-1]
         out = {}
-        for k in ["Close", "ema20", "ema50", "rsi", "adx", "atr", "atr_pct", "vwap", "macd"]:
+        for k in [
+            "Close",
+            "ema20",
+            "ema50",
+            "rsi",
+            "adx",
+            "atr",
+            "atr_pct",
+            "vwap",
+            "macd",
+        ]:
             if k in df.columns:
                 try:
                     out[k] = float(row[k])
@@ -165,12 +176,26 @@ def format_alert(
     safe_maxp = escape(str(expected.get("max_points", "n/a")))
 
     reasons = result.get("reasons", []) or []
-    reasons_text = "\n".join([f"- {escape(str(r))}" for r in reasons]) if reasons else "- (no reasons)"
+    reasons_text = (
+        "\n".join([f"- {escape(str(r))}" for r in reasons])
+        if reasons
+        else "- (no reasons)"
+    )
 
-    entry_text = "\n".join([f"- {escape(str(x))}" for x in extra_lines]) if extra_lines else "- (not checked)"
-    ind_text = "\n".join([f"- {escape(str(x))}" for x in indicator_lines]) if indicator_lines else "- (not available)"
+    entry_text = (
+        "\n".join([f"- {escape(str(x))}" for x in extra_lines])
+        if extra_lines
+        else "- (not checked)"
+    )
+    ind_text = (
+        "\n".join([f"- {escape(str(x))}" for x in indicator_lines])
+        if indicator_lines
+        else "- (not available)"
+    )
 
-    header = "✅ <b>ENTRY ALERT</b>" if alert_kind == "ENTRY" else "🟡 <b>SETUP ALERT</b>"
+    header = (
+        "✅ <b>ENTRY ALERT</b>" if alert_kind == "ENTRY" else "🟡 <b>SETUP ALERT</b>"
+    )
 
     # Patterns block (Top 2 per TF)
     pat_lines = _pattern_lines(result)
@@ -288,7 +313,9 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
             kind = "SETUP"
             if should_send_alert(symbol, kind, fp, SETUP_COOLDOWN_MIN, DB_PATH):
                 msg = format_alert(
-                    symbol, result, alert_kind="SETUP",
+                    symbol,
+                    result,
+                    alert_kind="SETUP",
                     extra_lines=["5m data fetch failed"],
                     indicator_lines=indicator_lines,
                 )
@@ -341,9 +368,13 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
     if trade_type == "BREAKOUT_TREND":
         level = result.get("breakout_level")
         if level is None:
-            entry_ok, entry_reasons = False, ["Missing breakout_level from strategy (cannot enforce retest)"]
+            entry_ok, entry_reasons = False, [
+                "Missing breakout_level from strategy (cannot enforce retest)"
+            ]
         else:
-            entry_ok, entry_reasons = confirm_breakout_retest_5m(df_5m, bias=bias, breakout_level=float(level))
+            entry_ok, entry_reasons = confirm_breakout_retest_5m(
+                df_5m, bias=bias, breakout_level=float(level)
+            )
     else:
         entry_ok, entry_reasons = confirm_entry_5m(df_5m, bias=bias)
 
@@ -408,7 +439,13 @@ def main(symbol: str = "BTC-USD", return_result: bool = False):
         return result if return_result else None
 
     if should_send_alert(symbol, kind, fp, cooldown, DB_PATH):
-        msg = format_alert(symbol, result, alert_kind=alert_kind, extra_lines=entry_reasons, indicator_lines=indicator_lines)
+        msg = format_alert(
+            symbol,
+            result,
+            alert_kind=alert_kind,
+            extra_lines=entry_reasons,
+            indicator_lines=indicator_lines,
+        )
         ok = send_telegram_alert(msg)
         insert_alert(
             {

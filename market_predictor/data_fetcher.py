@@ -3,13 +3,11 @@ import yfinance as yf
 import ccxt
 from datetime import datetime, timedelta, timezone
 
+
 def _is_yahoo_symbol(symbol: str) -> bool:
     # Yahoo patterns: XAUUSD=X, GC=F, AAPL, GOLDBEES.NS, etc.
-    return (
-        ("=" in symbol) or
-        symbol.endswith(".NS") or
-        symbol.endswith(".BO")
-    )
+    return ("=" in symbol) or symbol.endswith(".NS") or symbol.endswith(".BO")
+
 
 def _yf_allowed_period(tf: str, requested: str) -> str:
     """
@@ -20,14 +18,15 @@ def _yf_allowed_period(tf: str, requested: str) -> str:
     We'll cap automatically so your backtest doesn't crash.
     """
     tf = tf.lower()
-    intraday = tf in ("1m","2m","5m","15m","30m","60m","90m","1h")
+    intraday = tf in ("1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h")
 
     if tf == "1m":
         return "7d"
-    if tf in ("2m","5m","15m","30m","60m","90m"):
+    if tf in ("2m", "5m", "15m", "30m", "60m", "90m"):
         return "60d"
     # 1h and above can use requested safely (keep your requested)
     return requested if requested else "365d"
+
 
 def fetch_data(symbol: str, timeframe: str, period: str, only_closed: bool = True):
     timeframe = timeframe.lower()
@@ -53,7 +52,9 @@ def fetch_data(symbol: str, timeframe: str, period: str, only_closed: bool = Tru
         df = df.rename(columns=lambda c: c.strip().title())
 
         # Keep only expected cols
-        keep = [c for c in ["Open","High","Low","Close","Volume"] if c in df.columns]
+        keep = [
+            c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns
+        ]
         df = df[keep].dropna()
 
         # only_closed: last candle might be still forming, drop it for safety
@@ -79,7 +80,9 @@ def fetch_data(symbol: str, timeframe: str, period: str, only_closed: bool = Tru
     limit = 1000
     all_rows = []
     while True:
-        ohlcv = ex.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, since=since_ms, limit=limit)
+        ohlcv = ex.fetch_ohlcv(
+            ccxt_symbol, timeframe=timeframe, since=since_ms, limit=limit
+        )
         if not ohlcv:
             break
         all_rows.extend(ohlcv)
@@ -90,7 +93,9 @@ def fetch_data(symbol: str, timeframe: str, period: str, only_closed: bool = Tru
     if not all_rows:
         return pd.DataFrame()
 
-    df = pd.DataFrame(all_rows, columns=["Timestamp","Open","High","Low","Close","Volume"])
+    df = pd.DataFrame(
+        all_rows, columns=["Timestamp", "Open", "High", "Low", "Close", "Volume"]
+    )
     df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms", utc=True)
     df.set_index("Timestamp", inplace=True)
     df = df.astype(float)

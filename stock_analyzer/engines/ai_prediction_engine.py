@@ -143,6 +143,22 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     max_risk_pct = round(((current_price - stop_loss_price) / current_price) * 100, 2)
     risk_reward_ratio = round(expected_return_pct / max_risk_pct, 2) if max_risk_pct > 0 else 2.1
 
+    # Check Upcoming Earnings Catalyst & Event Risk (Minervini & O'Neil Rule)
+    earnings_warning = None
+    days_to_earn = stock.days_until_earnings
+    if days_to_earn is not None and 0 <= days_to_earn <= 12:
+        earnings_warning = (
+            f"⚠️ **Upcoming Earnings Catalyst**: Quarterly financial results scheduled for "
+            f"{stock.next_earnings_date.strftime('%d %b %Y')} (in {days_to_earn} days). "
+            f"Consensus EPS Estimate: ₹{stock.eps_estimate or 'N/A'}, "
+            f"Revenue Forecast: ₹{stock.revenue_estimate_crores:,.0f} Cr. "
+            f"Per Minervini SEPA rules, AI tightens stop buffer to mitigate binary earnings gap risk."
+        )
+        # Moderate confidence to prevent binary roulette trap
+        confidence_score = max(confidence_score - 6, 30)
+        if action == "STRONG_BUY":
+            action = "ACCUMULATE"
+
     # 8. Detailed AI Thesis Generation
     ai_thesis = (
         f"**Master Strategy Thesis for {stock.name} ({stock.symbol})**\n\n"
@@ -155,6 +171,9 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         f"• **Risk Management**: Risk ₹{stop_buffer:,.2f} (-{max_risk_pct}%) to make ₹{target_buffer:,.2f} (+{expected_return_pct}%), "
         f"giving a favorable **{risk_reward_ratio}x Risk-Reward profile**."
     )
+
+    if earnings_warning:
+        ai_thesis += f"\n\n{earnings_warning}"
 
     if lesson_notes:
         ai_thesis += f"\n\n🛡️ *Self-Learning Safeguard*: {' '.join(lesson_notes)}"

@@ -119,7 +119,9 @@ def confirm_entry_5m(df_5m, bias: str) -> Tuple[bool, List[str]]:
     return entry_ok, reasons
 
 
-def confirm_breakout_retest_5m(df_5m, bias: str, breakout_level: float) -> Tuple[bool, List[str]]:
+def confirm_breakout_retest_5m(
+    df_5m, bias: str, breakout_level: float
+) -> Tuple[bool, List[str]]:
     """
     Breakout retest entry logic (exact entry):
 
@@ -160,20 +162,30 @@ def confirm_breakout_retest_5m(df_5m, bias: str, breakout_level: float) -> Tuple
             break
 
     if not touched:
-        return False, [f"No retest near breakout level {level:.2f} (tol {tol:.2f}) on prior candles"]
+        return False, [
+            f"No retest near breakout level {level:.2f} (tol {tol:.2f}) on prior candles"
+        ]
 
     reasons: List[str] = [f"Retest detected near level {level:.2f} (tol {tol:.2f})"]
 
     # Step 2: Rejection close must be on LAST candle
     if bias == "Bullish":
         if close_now <= level:
-            return False, reasons + [f"Rejection not confirmed (close {close_now:.2f} <= level {level:.2f})"]
-        reasons.append(f"Rejection confirmed (close {close_now:.2f} > level {level:.2f})")
+            return False, reasons + [
+                f"Rejection not confirmed (close {close_now:.2f} <= level {level:.2f})"
+            ]
+        reasons.append(
+            f"Rejection confirmed (close {close_now:.2f} > level {level:.2f})"
+        )
 
     elif bias == "Bearish":
         if close_now >= level:
-            return False, reasons + [f"Rejection not confirmed (close {close_now:.2f} >= level {level:.2f})"]
-        reasons.append(f"Rejection confirmed (close {close_now:.2f} < level {level:.2f})")
+            return False, reasons + [
+                f"Rejection not confirmed (close {close_now:.2f} >= level {level:.2f})"
+            ]
+        reasons.append(
+            f"Rejection confirmed (close {close_now:.2f} < level {level:.2f})"
+        )
 
     else:
         return False, ["Neutral bias cannot confirm breakout retest"]

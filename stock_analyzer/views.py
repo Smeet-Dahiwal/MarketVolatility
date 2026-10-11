@@ -132,6 +132,14 @@ def stock_detail_view(request, symbol):
     target_dist_pct = round(((prediction.target_price - curr_price) / curr_price) * 100, 2)
     sl_dist_pct = round(((curr_price - prediction.stop_loss_price) / curr_price) * 100, 2)
 
+    # Shareholding breakdown
+    promoter_pct = stock.promoter_holding_pct or 0.0
+    fii_pct = stock.fii_holding_pct or 0.0
+    dii_pct = stock.dii_holding_pct or 0.0
+    institutional_pct = round(fii_pct + dii_pct, 1)
+    retail_pct = max(round(100.0 - (promoter_pct + fii_pct + dii_pct), 1), 0.0)
+    is_pe_cheaper = bool(stock.pe_ratio and stock.industry_pe and stock.pe_ratio < stock.industry_pe)
+
     context = {
         "stock": stock,
         "prediction": prediction,
@@ -139,6 +147,9 @@ def stock_detail_view(request, symbol):
         "smart_money": smart_money,
         "target_dist_pct": target_dist_pct,
         "sl_dist_pct": sl_dist_pct,
+        "retail_pct": retail_pct,
+        "institutional_pct": institutional_pct,
+        "is_pe_cheaper": is_pe_cheaper,
         "chart_data_json": json.dumps({
             "dates": chart_dates,
             "closes": chart_closes,

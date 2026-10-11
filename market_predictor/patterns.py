@@ -14,9 +14,9 @@ import pandas as pd
 @dataclass
 class PatternHit:
     name: str
-    kind: str              # "Triangle" | "Wedge" | "Flag" | "H&S" | ...
-    direction: str         # "Bullish" | "Bearish" | "Neutral"
-    confidence: int        # 0-100
+    kind: str  # "Triangle" | "Wedge" | "Flag" | "H&S" | ...
+    direction: str  # "Bullish" | "Bearish" | "Neutral"
+    confidence: int  # 0-100
     meta: dict
 
 
@@ -42,7 +42,9 @@ def _pct(a: float, b: float) -> float:
     return ((b - a) / abs(a)) * 100.0
 
 
-def _pivot_points(series: pd.Series, left: int = 3, right: int = 3, mode: str = "high") -> List[Tuple[int, float]]:
+def _pivot_points(
+    series: pd.Series, left: int = 3, right: int = 3, mode: str = "high"
+) -> List[Tuple[int, float]]:
     """
     Simple pivot detector.
     mode="high": pivot high when current > neighbors
@@ -53,8 +55,8 @@ def _pivot_points(series: pd.Series, left: int = 3, right: int = 3, mode: str = 
     out = []
     n = len(vals)
     for i in range(left, n - right):
-        window_left = vals[i - left:i]
-        window_right = vals[i + 1:i + 1 + right]
+        window_left = vals[i - left : i]
+        window_right = vals[i + 1 : i + 1 + right]
         if mode == "high":
             if vals[i] > window_left.max() and vals[i] > window_right.max():
                 out.append((i, float(vals[i])))
@@ -121,7 +123,7 @@ def _detect_triangle(df: pd.DataFrame, lookback: int = 80) -> Optional[PatternHi
     range_end = float(d["High"].iloc[-1] - d["Low"].iloc[-1])
     if range_start <= 0:
         return None
-    shrink = (range_end / range_start)
+    shrink = range_end / range_start
 
     if shrink > 0.85:
         return None  # not contracting enough
@@ -155,7 +157,12 @@ def _detect_triangle(df: pd.DataFrame, lookback: int = 80) -> Optional[PatternHi
         kind=kind,
         direction=direction,
         confidence=int(conf),
-        meta={"lookback": lookback, "shrink": round(shrink, 3), "sh_pct": round(sh_pct, 4), "sl_pct": round(sl_pct, 4)},
+        meta={
+            "lookback": lookback,
+            "shrink": round(shrink, 3),
+            "sh_pct": round(sh_pct, 4),
+            "sl_pct": round(sl_pct, 4),
+        },
     )
 
 
@@ -202,11 +209,16 @@ def _detect_flag(df: pd.DataFrame, lookback: int = 60) -> Optional[PatternHit]:
         kind="Flag",
         direction=direction,
         confidence=int(conf),
-        meta={"impulse_atr": round(abs(imp_move) / atr, 2), "cons_range_atr": round(cons_range / atr, 2)},
+        meta={
+            "impulse_atr": round(abs(imp_move) / atr, 2),
+            "cons_range_atr": round(cons_range / atr, 2),
+        },
     )
 
 
-def _detect_head_shoulders(df: pd.DataFrame, lookback: int = 120) -> Optional[PatternHit]:
+def _detect_head_shoulders(
+    df: pd.DataFrame, lookback: int = 120
+) -> Optional[PatternHit]:
     """
     Simplified Head & Shoulders (bearish) / Inverse H&S (bullish):
     Uses pivot highs (or lows) and checks the middle pivot is the extreme.

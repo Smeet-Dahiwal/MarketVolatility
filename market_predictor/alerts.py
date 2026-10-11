@@ -6,13 +6,10 @@ from twilio.rest import Client
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("TELEGRAM_GROUP_ID")
 
+
 def send_telegram_alert(message: str) -> bool:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": GROUP_CHAT_ID,
-        "text": message,
-        "parse_mode": "HTML"
-    }
+    payload = {"chat_id": GROUP_CHAT_ID, "text": message, "parse_mode": "HTML"}
     r = requests.post(url, data=payload)
 
     if r.status_code != 200:
@@ -36,11 +33,7 @@ def send_whatsapp_alert(message: str):
 
         client = Client(account_sid, auth_token)
 
-        msg = client.messages.create(
-            body=message,
-            from_=from_whatsapp,
-            to=to_whatsapp
-        )
+        msg = client.messages.create(body=message, from_=from_whatsapp, to=to_whatsapp)
 
         print(f"✅ WhatsApp alert sent | SID: {msg.sid}")
 

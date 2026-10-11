@@ -14,9 +14,38 @@ class Stock(models.Model):
     eps_growth_yoy = models.FloatField(null=True, blank=True)
     fifty_two_week_high = models.FloatField(null=True, blank=True)
     fifty_two_week_low = models.FloatField(null=True, blank=True)
+    
+    # Detailed Business & Shareholding Fundamentals
+    book_value = models.FloatField(null=True, blank=True)
+    dividend_yield_pct = models.FloatField(null=True, blank=True)
+    promoter_holding_pct = models.FloatField(null=True, blank=True)
+    fii_holding_pct = models.FloatField(null=True, blank=True)
+    dii_holding_pct = models.FloatField(null=True, blank=True)
+    operating_margin_pct = models.FloatField(null=True, blank=True)
+    profit_margin_pct = models.FloatField(null=True, blank=True)
+    industry_pe = models.FloatField(null=True, blank=True)
+    piotroski_score = models.IntegerField(default=8) # 0 to 9 financial health score
+
+    # TradingView Financial Profile & Upcoming Earnings Factors
+    next_earnings_date = models.DateField(null=True, blank=True)
+    eps_estimate = models.FloatField(null=True, blank=True)
+    revenue_estimate_crores = models.FloatField(null=True, blank=True)
+    revenue_growth_yoy = models.FloatField(null=True, blank=True)
+    full_time_employees = models.IntegerField(null=True, blank=True)
+    headquarters_city = models.CharField(max_length=100, default="Mumbai")
+    industry_name = models.CharField(max_length=120, default="Major Banks")
+    business_summary = models.TextField(blank=True, default="")
+
     is_nifty50 = models.BooleanField(default=False)
     is_banknifty = models.BooleanField(default=False)
     last_updated = models.DateTimeField(auto_now=True)
+
+    @property
+    def days_until_earnings(self):
+        if not self.next_earnings_date:
+            return None
+        from django.utils import timezone
+        return (self.next_earnings_date - timezone.now().date()).days
 
     def __str__(self):
         return f"{self.symbol} ({self.name})"
