@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -76,22 +77,36 @@ def fetch_or_update_stock(symbol: str, force_refresh: bool = False) -> Stock:
         if latest_price and (today - latest_price.date).days <= 1:
             return stock
 
-    # Download real historical & live data
-    try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="2y", interval="1d")
-    except Exception as e:
-        logger.error(f"Error downloading data for {symbol}: {e}")
-        hist = pd.DataFrame()
-
-    if hist.empty:
-        # If network error, try downloading with yf.download
+    # Download real historical & live data with retry
+    ticker = None
+    hist = pd.DataFrame()
+    for attempt in range(2):
         try:
-            hist = yf.download(symbol, period="2y", interval="1d", progress=False)
-        except Exception:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="2y", interval="1d")
+            if not hist.empty:
+                break
+        except Exception as e:
+            logger.error(f"Error downloading data for {symbol} (attempt {attempt+1}): {e}")
             hist = pd.DataFrame()
 
+        if hist.empty:
+            time.sleep(1.0)
+            try:
+                hist = yf.download(symbol, period="2y", interval="1d", progress=False)
+                if not hist.empty:
+                    break
+            except Exception:
+                hist = pd.DataFrame()
+
+        if not hist.empty:
+            break
+        time.sleep(1.2)
+
     if hist.empty:
+        if stock:
+            logger.warning(f"Could not fetch fresh data for existing stock {symbol}, keeping current data.")
+            return stock
         raise ValueError(f"Could not fetch live market data for {symbol} from NSE/BSE.")
 
     # Flatten columns if multi-index
@@ -342,6 +357,7 @@ def get_market_benchmarks():
                 "change_pct": meta["change_pct"],
                 "is_positive": meta["change_pct"] >= 0
             }
+        time.sleep(0.5)
 
     # Market regime calculation
     vix = results.get("India VIX", {}).get("price", 14.0)

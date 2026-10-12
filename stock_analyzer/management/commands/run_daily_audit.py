@@ -1,4 +1,5 @@
 import json
+import time
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from stock_analyzer.models import Stock, AIPrediction, PredictionAudit, DailyVerificationLog
@@ -30,6 +31,7 @@ class Command(BaseCommand):
             try:
                 fetch_or_update_stock(stock.symbol, force_refresh=True)
                 updated_count += 1
+                time.sleep(1.2)  # Pacing to avoid IP throttling in cloud runners
             except Exception as e:
                 self.stdout.write(self.style.WARNING(f"  Warning updating {stock.symbol}: {e}"))
 
