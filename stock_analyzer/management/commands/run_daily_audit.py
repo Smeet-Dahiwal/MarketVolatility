@@ -42,9 +42,9 @@ class Command(BaseCommand):
         self.stdout.write("Running verification audit on active predictions...")
         audit_res = run_daily_verification_audit()
 
-        # 4. Generate/Refresh AI Predictions for Key Stocks
-        self.stdout.write("Refreshing AI prediction forecasts...")
-        for stock in stocks[:8]:
+        # 4. Generate/Refresh AI Predictions for All Tracked Stocks
+        self.stdout.write(f"Refreshing AI prediction forecasts for all {stocks.count()} stocks...")
+        for stock in stocks:
             try:
                 generate_ai_stock_prediction(stock, force_new=True)
             except Exception as e:
@@ -75,15 +75,39 @@ class Command(BaseCommand):
         with open("audit_summary.json", "w") as f:
             json.dump(summary, f, indent=2)
 
-        # 6. Dispatch Instant Telegram Alert
-        top_calls = AIPrediction.objects.filter(status="ACTIVE").order_by("-confidence_score")[:6]
+        # 6. Build Detailed Per-Stock Prediction & Win Rate Records
+        stock_items = []
+        for stock in stocks:
+            latest_pred = AIPrediction.objects.filter(stock=stock, status="ACTIVE").order_by("-prediction_date", "-id").first()
+            if not latest_pred:
+                latest_pred = AIPrediction.objects.filter(stock=stock).order_by("-prediction_date", "-id").first()
+            
+            audits = PredictionAudit.objects.filter(prediction__stock=stock)
+            s_wins = audits.filter(is_successful=True).count()
+            s_total = audits.count()
+            s_win_rate = round((s_wins / s_total * 100), 1) if s_total > 0 else round(float(latest_pred.confidence_score if latest_pred else 72.0), 1)
+
+            stock_items.append({
+                "symbol": stock.symbol,
+                "name": stock.name,
+                "action": latest_pred.action if latest_pred else "HOLD",
+                "action_label": latest_pred.get_action_display() if latest_pred else "HOLD / WAIT 🟡",
+                "current_price": stock.current_price,
+                "target_price": latest_pred.target_price if latest_pred else None,
+                "stop_loss_price": latest_pred.stop_loss_price if latest_pred else None,
+                "confidence_score": latest_pred.confidence_score if latest_pred else 75,
+                "win_rate": s_win_rate,
+                "trades_count": s_total
+            })
+
+        # 7. Dispatch Comprehensive Telegram Alert
         today_date = timezone.now().date()
         today_audits = PredictionAudit.objects.filter(resolved_date=today_date)
-        telegram_sent = send_telegram_alert(summary, top_predictions=list(top_calls), newly_resolved_audits=list(today_audits))
+        telegram_sent = send_telegram_alert(summary, stock_items=stock_items, newly_resolved_audits=list(today_audits))
         if telegram_sent:
-            self.stdout.write(self.style.SUCCESS("  Dispatched Telegram notification alert to your phone!"))
+            self.stdout.write(self.style.SUCCESS("  Dispatched Telegram notification alert for all stocks to your group!"))
         else:
-            self.stdout.write(self.style.WARNING("  Telegram notification not delivered (ensure bot is started or check chat ID)."))
+            self.stdout.write(self.style.WARNING("  Telegram notification not delivered (ensure bot is added to group as admin)."))
 
         self.stdout.write(self.style.SUCCESS("=" * 70))
         self.stdout.write(self.style.SUCCESS(f"  AUDIT COMPLETED! Win Rate: {win_rate}% | Active Calls: {active_preds}"))
