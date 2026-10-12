@@ -35,6 +35,9 @@ jobs:
           python manage.py migrate
 
       - name: Execute Daily 4:00 PM Verification Audit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python manage.py run_daily_audit
 

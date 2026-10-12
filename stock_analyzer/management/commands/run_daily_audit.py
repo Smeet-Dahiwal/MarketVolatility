@@ -6,6 +6,7 @@ from stock_analyzer.models import Stock, AIPrediction, PredictionAudit, DailyVer
 from stock_analyzer.engines.data_engine import fetch_or_update_stock, get_market_benchmarks
 from stock_analyzer.engines.verification_engine import run_daily_verification_audit
 from stock_analyzer.engines.ai_prediction_engine import generate_ai_stock_prediction
+from stock_analyzer.engines.notifier_engine import send_telegram_alert
 
 
 class Command(BaseCommand):
@@ -73,6 +74,16 @@ class Command(BaseCommand):
         # Write summary JSON for GitHub Actions / CI/CD pipeline
         with open("audit_summary.json", "w") as f:
             json.dump(summary, f, indent=2)
+
+        # 6. Dispatch Instant Telegram Alert
+        top_calls = AIPrediction.objects.filter(status="ACTIVE").order_by("-confidence_score")[:6]
+        today_date = timezone.now().date()
+        today_audits = PredictionAudit.objects.filter(resolved_date=today_date)
+        telegram_sent = send_telegram_alert(summary, top_predictions=list(top_calls), newly_resolved_audits=list(today_audits))
+        if telegram_sent:
+            self.stdout.write(self.style.SUCCESS("  Dispatched Telegram notification alert to your phone!"))
+        else:
+            self.stdout.write("  Telegram notification skipped (credentials not in environment).")
 
         self.stdout.write(self.style.SUCCESS("=" * 70))
         self.stdout.write(self.style.SUCCESS(f"  AUDIT COMPLETED! Win Rate: {win_rate}% | Active Calls: {active_preds}"))
