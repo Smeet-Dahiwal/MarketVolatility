@@ -83,7 +83,7 @@ class Command(BaseCommand):
         if telegram_sent:
             self.stdout.write(self.style.SUCCESS("  Dispatched Telegram notification alert to your phone!"))
         else:
-            self.stdout.write("  Telegram notification skipped (credentials not in environment).")
+            self.stdout.write(self.style.WARNING("  Telegram notification not delivered (ensure bot is started or check chat ID)."))
 
         self.stdout.write(self.style.SUCCESS("=" * 70))
         self.stdout.write(self.style.SUCCESS(f"  AUDIT COMPLETED! Win Rate: {win_rate}% | Active Calls: {active_preds}"))
