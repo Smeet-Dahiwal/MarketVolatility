@@ -2,9 +2,11 @@ name: Automated Stock Audit & Data Sync
 
 on:
   schedule:
-    # 10:30 UTC = 4:00 PM IST (Monday through Friday)
-    - cron: '30 10 * * 1-5'
+    # 10:35 UTC = 4:05 PM IST (Avoiding high-congestion :30 minute mark)
+    - cron: '35 10 * * 1-5'
   workflow_dispatch: # Allows manual 1-click trigger from GitHub Actions web tab
+  repository_dispatch: # Allows instant exact-second trigger via free external webhook/cron
+    types: [daily-stock-audit]
 
 permissions:
   contents: write

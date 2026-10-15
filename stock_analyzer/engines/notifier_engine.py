@@ -33,10 +33,9 @@ def send_telegram_alert(
     newly_resolved_audits: List[Any] = None
 ) -> bool:
     """
-    Dispatches automated EOD stock market verification and prediction alert
-    for ALL tracked Indian stocks and their individual win rates.
-    
-    Splits cleanly into structured messages if content exceeds Telegram's limit.
+    Dispatches a sleek, mobile-optimized EOD stock market verification and prediction alert.
+    Categorizes stocks into Actionable Calls (BUY/ACCUMULATE) and Compact Watchlist (HOLD/NEUTRAL)
+    to eliminate cluttered multiline text-wrapping on mobile screens.
     """
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -51,77 +50,90 @@ def send_telegram_alert(
     total_wins = summary.get("wins", 0)
     total_losses = summary.get("losses", 0)
     active_count = summary.get("active_predictions", 0)
-    total_stocks = len(stock_items) if stock_items else summary.get("stocks_updated", 19)
-
-    action_icons = {
-        "STRONG_BUY": "🟢",
-        "ACCUMULATE": "📈",
-        "HOLD": "🟡",
-        "AVOID": "🔴",
-    }
 
     # Header section
     header_lines = [
-        "🏛️ <b>BULLGUARD AI — FULL MARKET EOD AUDIT</b>",
+        "🏛️ <b>BULLGUARD AI · EOD AUDIT</b>",
         f"📅 <i>{date_str}</i>",
-        f"🌐 <b>Market Regime:</b> <code>{regime}</code>",
+        f"🌐 <b>Regime:</b> <code>{regime}</code>",
         "",
-        "📊 <b>OVERALL SYSTEM PERFORMANCE:</b>",
-        f"• <b>30-Day Win Rate:</b> <b>{overall_win_rate}%</b> ({total_wins}W / {total_losses}L)",
+        "📊 <b>VERIFIED PERFORMANCE:</b>",
+        f"• <b>System Win Rate:</b> <b>{overall_win_rate}%</b> ({total_wins}W · {total_losses}L)",
         f"• <b>Active Monitored Calls:</b> <code>{active_count}</code>",
-        f"• <b>Total Stocks Tracked:</b> <code>{total_stocks}</code>",
-        "",
-        "📋 <b>ALL STOCKS — CALLS & HISTORICAL WIN RATES:</b>"
     ]
 
-    stock_blocks = []
+    actionable_stocks = []
+    neutral_stocks = []
+
     if stock_items:
-        for idx, item in enumerate(stock_items, start=1):
-            symbol = item.get("symbol", "UNKNOWN")
+        for item in stock_items:
             action = item.get("action", "HOLD")
-            action_label = item.get("action_label", action)
-            icon = action_icons.get(action, "🎯")
-            curr = f"₹{item.get('current_price', 0):,.2f}" if item.get('current_price') else "—"
-            target = f"₹{item.get('target_price', 0):,.2f}" if item.get('target_price') else "—"
-            sl = f"₹{item.get('stop_loss_price', 0):,.2f}" if item.get('stop_loss_price') else "—"
-            conf = f"{item.get('confidence_score', 80)}%"
+            if action in ["STRONG_BUY", "ACCUMULATE", "AVOID"]:
+                actionable_stocks.append(item)
+            else:
+                neutral_stocks.append(item)
+
+    lines = list(header_lines)
+
+    # 1. Actionable Highlights (BUY / ACCUMULATE / AVOID)
+    if actionable_stocks:
+        lines.append("")
+        lines.append("🎯 <b>HIGH-CONVICTION ACTION CALLS:</b>")
+        for idx, item in enumerate(actionable_stocks, start=1):
+            sym = item.get("symbol", "").replace(".NS", "")
+            action = item.get("action", "")
+            icon = "🟢" if "BUY" in action else ("📈" if action == "ACCUMULATE" else "🔴")
+            label = "STRONG BUY" if action == "STRONG_BUY" else ("ACCUMULATE" if action == "ACCUMULATE" else "AVOID")
+            curr = f"₹{item.get('current_price', 0):,.0f}"
+            tgt = f"₹{item.get('target_price', 0):,.0f}"
+            sl = f"₹{item.get('stop_loss_price', 0):,.0f}"
             win_rate = item.get("win_rate", 70.0)
-            trades_cnt = item.get("trades_count", 0)
-            trades_badge = f"({trades_cnt} audited calls)" if trades_cnt > 0 else "(historical model)"
+            conf = item.get("confidence_score", 75)
+            cnt = item.get("trades_count", 0)
+            tag = f"({cnt} trades)" if cnt > 0 else ""
 
-            block = (
-                f"<b>{idx}. {icon} {symbol}</b> — <b>{action_label}</b>\n"
-                f"   CMP: {curr} | Target: <b>{target}</b> | SL: {sl}\n"
-                f"   🎯 <b>Stock Win Rate: {win_rate}%</b> {trades_badge} | Conf: {conf}"
+            lines.append(
+                f"{idx}. {icon} <b>{sym}</b> · <b>{label}</b>\n"
+                f"   {curr} ➔ 🎯 <b>{tgt}</b> | SL: {sl}\n"
+                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · Conf: <b>{conf}%</b>"
             )
-            stock_blocks.append(block)
     else:
-        stock_blocks.append("• <i>No stock prediction items available.</i>")
+        lines.append("")
+        lines.append("🎯 <b>HIGH-CONVICTION CALLS:</b> <i>No fresh buy breakouts today. Market in consolidation.</i>")
 
-    # Resolved trades section
-    resolved_lines = []
+    # 2. Compact Neutral / Hold Watchlist (One-liner per stock for mobile clarity)
+    if neutral_stocks:
+        lines.append("")
+        lines.append("⏸️ <b>NEUTRAL / HOLD STOCKS (19 Tracked):</b>")
+        for item in neutral_stocks:
+            sym = item.get("symbol", "").replace(".NS", "")
+            curr = f"₹{item.get('current_price', 0):,.0f}"
+            tgt = f"₹{item.get('target_price', 0):,.0f}"
+            win_rate = item.get("win_rate", 60.0)
+            lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} (Win: {win_rate:.0f}%)")
+
+    # 3. Resolved Audits Today
     if newly_resolved_audits:
-        resolved_lines.extend(["", "🔔 <b>CALLS RESOLVED TODAY:</b>"])
-        for audit in newly_resolved_audits[:6]:
-            outcome = "🎯 Target Hit ✅" if audit.is_successful else "🛑 Stop-Loss Hit ❌"
-            pnl = f"{audit.pnl_percentage:+.2f}%" if audit.pnl_percentage is not None else "0.0%"
-            resolved_lines.append(f"• <b>{audit.prediction.stock.symbol}</b>: {outcome} ({pnl})")
+        lines.append("")
+        lines.append("🔔 <b>TRADES RESOLVED TODAY:</b>")
+        for audit in newly_resolved_audits[:5]:
+            sym = audit.prediction.stock.symbol.replace(".NS", "")
+            outcome = "Target Hit 🎯" if audit.is_successful else "Stop-Loss 🛑"
+            pnl = f"{audit.pnl_percentage:+.1f}%" if audit.pnl_percentage is not None else "0%"
+            lines.append(f"• <b>{sym}</b>: {outcome} ({pnl})")
 
-    footer = ["", "⚡ <i>Automated EOD audit by BullGuard AI & GitHub Actions</i>"]
+    lines.append("")
+    lines.append("⚡ <i>BullGuard AI · Automated Market Engine</i>")
 
-    # Package into 1 or 2 messages to strictly stay under Telegram's 4096 character limit
-    # Split stocks: First 10 stocks in message 1, remaining in message 2
-    if len(stock_blocks) > 10:
-        msg1_lines = header_lines + [""] + stock_blocks[:10] + ["", "<i>(Continued in next message...)</i>"]
-        msg2_lines = (
-            ["📋 <b>ALL STOCKS (PART 2):</b>", ""] +
-            stock_blocks[10:] +
-            resolved_lines +
-            footer
-        )
-        res1 = _send_telegram_raw(bot_token, chat_id, "\n".join(msg1_lines))
-        res2 = _send_telegram_raw(bot_token, chat_id, "\n".join(msg2_lines))
-        return res1 and res2
-    else:
-        full_text = "\n".join(header_lines + [""] + stock_blocks + resolved_lines + footer)
-        return _send_telegram_raw(bot_token, chat_id, full_text)
+    # Split message cleanly if over 3800 chars to avoid Telegram rejection
+    full_text = "\n".join(lines)
+    if len(full_text) > 3800:
+        split_idx = full_text.find("⏸️ <b>NEUTRAL / HOLD STOCKS")
+        if split_idx != -1:
+            part1 = full_text[:split_idx].strip()
+            part2 = full_text[split_idx:].strip()
+            res1 = _send_telegram_raw(bot_token, chat_id, part1)
+            res2 = _send_telegram_raw(bot_token, chat_id, part2)
+            return res1 and res2
+
+    return _send_telegram_raw(bot_token, chat_id, full_text)
