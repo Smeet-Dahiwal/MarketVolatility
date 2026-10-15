@@ -112,12 +112,16 @@ def send_telegram_alert(
             win_rate = item.get("win_rate", 60.0)
             lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} (Win: {win_rate:.0f}%)")
 
-    # 3. Resolved Audits Today
+    # 3. Resolved Audits Today (Deduplicated per stock symbol)
     if newly_resolved_audits:
         lines.append("")
         lines.append("🔔 <b>TRADES RESOLVED TODAY:</b>")
-        for audit in newly_resolved_audits[:5]:
+        seen_resolved = set()
+        for audit in newly_resolved_audits:
             sym = audit.prediction.stock.symbol.replace(".NS", "")
+            if sym in seen_resolved:
+                continue
+            seen_resolved.add(sym)
             outcome = "Target Hit 🎯" if audit.is_successful else "Stop-Loss 🛑"
             pnl = f"{audit.pnl_percentage:+.1f}%" if audit.pnl_percentage is not None else "0%"
             lines.append(f"• <b>{sym}</b>: {outcome} ({pnl})")

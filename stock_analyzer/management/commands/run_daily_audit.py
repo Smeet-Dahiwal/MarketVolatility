@@ -42,13 +42,18 @@ class Command(BaseCommand):
         self.stdout.write("Running verification audit on active predictions...")
         audit_res = run_daily_verification_audit()
 
-        # 4. Generate/Refresh AI Predictions for All Tracked Stocks
-        self.stdout.write(f"Refreshing AI prediction forecasts for all {stocks.count()} stocks...")
+        # 4. Generate/Refresh AI Predictions for Stocks Needing New Trade Cycles
+        self.stdout.write("Checking if any stocks need new prediction trade cycles...")
+        new_preds_count = 0
         for stock in stocks:
-            try:
-                generate_ai_stock_prediction(stock, force_new=True)
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(f"  Warning generating prediction for {stock.symbol}: {e}"))
+            # If stock's previous trade resolved (or hasn't started), generate fresh forecast
+            if not AIPrediction.objects.filter(stock=stock, status="ACTIVE").exists():
+                try:
+                    generate_ai_stock_prediction(stock)
+                    new_preds_count += 1
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f"  Warning generating prediction for {stock.symbol}: {e}"))
+        self.stdout.write(f"Generated {new_preds_count} fresh trade cycles.")
 
         # 5. Output Summary & Save JSON Artifact
         latest_log = DailyVerificationLog.objects.first()

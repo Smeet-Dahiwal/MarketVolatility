@@ -178,7 +178,10 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     if lesson_notes:
         ai_thesis += f"\n\n🛡️ *Self-Learning Safeguard*: {' '.join(lesson_notes)}"
 
-    # 9. Create and Save Prediction
+    # 9. Ensure single active prediction per stock (expire older active predictions)
+    AIPrediction.objects.filter(stock=stock, status="ACTIVE").update(status="EXPIRED")
+
+    # Create and Save Prediction
     prediction = AIPrediction.objects.create(
         stock=stock,
         prediction_date=today,
