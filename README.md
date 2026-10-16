@@ -163,35 +163,40 @@ $$\text{Composite Score} = (S_{\text{SmartMoney}} \times 0.30) + (S_{\text{BookR
 
 ---
 
-## 🎯 Disciplined 1:3 Risk-to-Reward Ratio: Swing (15-Day) vs. Monthly (30-Day)
+## 🎯 Disciplined 1:3 Risk-to-Reward Ratio: Next-Day (1D) vs. Weekly (5D) vs. Monthly (20D)
 
-BullGuard AI enforces a **strict, non-negotiable 1:3 Risk-to-Reward Ratio ($RR = 3.0$)** on every single signal. The potential gain is mathematically calibrated to be exactly **3× the risk taken**.
+BullGuard AI calculates predictions across **three distinct time horizons**, checking and verifying predictions after **1 day** instead of waiting 7 days. Every signal enforces a **strict, non-negotiable 1:3 Risk-to-Reward Ratio ($RR = 3.0$)**:
 
 ```
-                         Entry Price (CMP)
-                                │
-        ┌───────────────────────┴───────────────────────┐
-        ▼                                               ▼
-  15-Day Swing Target                             30-Day Monthly Target
-  [Typical: +7.5% to +10.5%]                      [Typical: +11.0% to +16.0%]
-  Formula: CMP + (Stop Buffer × 3.0)              Formula: CMP + (Monthly Stop Buffer × 3.0)
-        │                                               │
-        └───────────────────────┬───────────────────────┘
-                                ▼
-                       Strict Stop-Loss
-                  [Typical: -2.5% to -3.5%]
-             Formula: CMP - Max(1.5 × ATR, 2% CMP)
-                    [Risk-to-Reward: EXACTLY 1:3]
+                                  Entry Price (CMP)
+                                          │
+       ┌──────────────────────────────────┼──────────────────────────────────┐
+       ▼                                  ▼                                  ▼
+Next-Day Target (1-Day)          Weekly Target (5-Day)             Monthly Target (20-Day)
+[Typical: +3.0% to +5.0%]        [Typical: +7.0% to +10.5%]        [Typical: +12.0% to +18.0%]
+Verified: Next Trading Day       Verified: Weekly Cycle            Verified: Monthly Cycle
+Formula: CMP + (1D Stop × 3.0)   Formula: CMP + (5D Stop × 3.0)    Formula: CMP + (20D Stop × 3.0)
+       │                                  │                                  │
+       └──────────────────────────────────┼──────────────────────────────────┘
+                                          ▼
+                                   Strict Stop-Loss
+                         Formula: CMP - Stop Buffer (1D / 5D / 20D)
+                              [Risk-to-Reward: EXACTLY 1:3]
 ```
 
-### 1. Mathematical 1:3 Calculation:
-1. **Stop Buffer**: $\text{Stop Buffer} = \max(1.5 \times \text{ATR}_{14},\, 0.02 \times \text{CMP})$
-2. **Stop Loss Price**: $\text{SL} = \text{CMP} - \text{Stop Buffer}$ (Risk $= \text{Stop Buffer}$)
-3. **15-Day Target Price**: $\text{Target}_{15\text{D}} = \text{CMP} + (\text{Stop Buffer} \times 3.0)$ (Reward $= 3 \times \text{Risk}$)
-4. **30-Day Monthly Target**: 
-   $$\text{Monthly Stop Buffer} = \max(2.0 \times \text{ATR}_{14},\, 0.03 \times \text{CMP})$$
-   $$\text{Target}_{30\text{D}} = \text{CMP} + (\text{Monthly Stop Buffer} \times 3.0)$$
-   $$\text{SL}_{30\text{D}} = \text{CMP} - \text{Monthly Stop Buffer}$$
+### Horizon Calibration & Verification Rules:
+1. **Next-Day (Daily) Prediction ⚡ (`timeframe_type='DAILY'`, `timeframe_days=1`)**:
+   * **Stop Buffer**: $\text{Stop Buffer} = \max(0.75 \times \text{ATR}_{14},\, 0.01 \times \text{CMP})$.
+   * **Target Price**: $\text{CMP} + (\text{Stop Buffer} \times 3.0)$ (Strict 1:3 RR).
+   * **Verification Cadence**: **Verified the very next day** against that session's High/Low/Close. If neither Target nor SL is triggered, it resolves at next-day market close.
+2. **Weekly Swing Prediction 📅 (`timeframe_type='WEEKLY'`, `timeframe_days=5`)**:
+   * **Stop Buffer**: $\text{Stop Buffer} = \max(1.5 \times \text{ATR}_{14},\, 0.02 \times \text{CMP})$.
+   * **Target Price**: $\text{CMP} + (\text{Stop Buffer} \times 3.0)$ (Strict 1:3 RR).
+   * **Verification Cadence**: **Verified weekly** (monitored over 5 trading days). Resolves if Target/SL is hit or on Day 5 market close.
+3. **Monthly Position Prediction 🗓️ (`timeframe_type='MONTHLY'`, `timeframe_days=20`)**:
+   * **Stop Buffer**: $\text{Stop Buffer} = \max(2.5 \times \text{ATR}_{14},\, 0.035 \times \text{CMP},\, \text{CMP} - \text{EMA}_{50})$.
+   * **Target Price**: $\text{CMP} + (\text{Stop Buffer} \times 3.0)$ (Strict 1:3 RR).
+   * **Verification Cadence**: **Verified monthly** (monitored over 20-30 trading days). Resolves if Target/SL is hit or on Month close.
 
 **Why 1:3 RR is Crucial**: With a disciplined 1:3 risk-to-reward ratio, a trader remains solidly profitable even with a modest **35% win rate**! BullGuard AI's historical win rate of $>65\%$ combined with $1:3$ asymmetry creates an extraordinary statistical edge.
 

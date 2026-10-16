@@ -6,18 +6,38 @@ from stock_analyzer.engines.book_strategy_engine import evaluate_all_book_strate
 from stock_analyzer.engines.data_engine import get_market_benchmarks
 
 
-def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPrediction:
+def generate_ai_stock_prediction(
+    stock: Stock,
+    timeframe_type: str = "DAILY",
+    force_new: bool = False
+) -> AIPrediction:
     """
-    Generates multi-factor AI trade forecast combining Technicals, Fundamentals,
-    Smart Money / Mutual Fund Inflows, Trading Book Rules, and Database Lesson Memory.
+    Generates multi-factor AI trade forecast for a specific horizon:
+    - DAILY: Next-day trading range (verified after 1 day).
+    - WEEKLY: 1-week swing momentum (verified weekly / 5 days).
+    - MONTHLY: 1-month position trend (verified monthly / 20 days).
+    All horizons enforce a strict 1:3 Risk-to-Reward ratio.
     """
     today = timezone.now().date()
+    timeframe_type = timeframe_type.upper()
+    if timeframe_type not in ["DAILY", "WEEKLY", "MONTHLY"]:
+        timeframe_type = "DAILY"
 
-    # If recent prediction exists within 3 days and not forced, reuse it
+    # Reuse existing active prediction if still within its valid timeframe cycle
     if not force_new:
-        existing = AIPrediction.objects.filter(stock=stock, status="ACTIVE").order_by("-prediction_date").first()
-        if existing and (today - existing.prediction_date).days <= 3:
-            return existing
+        existing = AIPrediction.objects.filter(
+            stock=stock,
+            timeframe_type=timeframe_type,
+            status="ACTIVE"
+        ).order_by("-prediction_date", "-id").first()
+        if existing:
+            days_elapsed = (today - existing.prediction_date).days
+            if timeframe_type == "DAILY" and days_elapsed < 1:
+                return existing
+            elif timeframe_type == "WEEKLY" and days_elapsed < 5:
+                return existing
+            elif timeframe_type == "MONTHLY" and days_elapsed < 20:
+                return existing
 
     # 1. Fetch latest prices & technicals
     prices = DailyPriceData.objects.filter(stock=stock).order_by("-date")[:30]
@@ -175,11 +195,24 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         reason_flag = "Downtrend structure, negative news, or lack of institutional support."
 
     # 8. Asymmetric Risk Management (Disciplined 1:3 Risk-to-Reward Ratio)
-    # Stop-Loss buffer based on ATR (minimum 2% buffer for normal volatility)
-    stop_buffer = round(max(atr * 1.5, current_price * 0.02), 2)
-    # 15-Day Swing Target: Strictly 3.0x Risk Buffer (1:3 RR)
-    target_buffer = round(stop_buffer * 3.0, 2)
+    if timeframe_type == "DAILY":
+        timeframe_days = 1
+        # Next-day intraday buffer (min 1.0% buffer)
+        stop_buffer = round(max(atr * 0.75, current_price * 0.01), 2)
+        horizon_title = "Next-Day (Daily) ⚡"
+    elif timeframe_type == "WEEKLY":
+        timeframe_days = 5
+        # 1-week swing buffer (min 2.0% buffer)
+        stop_buffer = round(max(atr * 1.5, current_price * 0.02), 2)
+        horizon_title = "Weekly (Swing) 📅"
+    else:  # MONTHLY
+        timeframe_days = 20
+        # 1-month position buffer (min 3.5% buffer)
+        stop_buffer = round(max(atr * 2.5, current_price * 0.035, current_price - (ema50 * 0.99)), 2)
+        horizon_title = "Monthly (Position) 🗓️"
 
+    # Strictly 3.0x Risk Buffer (1:3 RR)
+    target_buffer = round(stop_buffer * 3.0, 2)
     stop_loss_price = round(current_price - stop_buffer, 2)
     target_price = round(current_price + target_buffer, 2)
 
@@ -187,8 +220,8 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     max_risk_pct = round(((current_price - stop_loss_price) / current_price) * 100, 2)
     risk_reward_ratio = 3.0 # Exact 1:3 Risk-Reward Ratio
 
-    # 30-Day Monthly Target Horizons (also maintaining 1:3 RR)
-    monthly_stop_buffer = round(max(stop_buffer * 1.35, current_price - (ema50 * 0.99)), 2)
+    # 30-Day Monthly Target Horizons Reference (also maintaining 1:3 RR)
+    monthly_stop_buffer = round(max(atr * 2.5, current_price * 0.035, current_price - (ema50 * 0.99)), 2)
     monthly_target_buffer = round(monthly_stop_buffer * 3.0, 2)
     monthly_target_price = round(current_price + monthly_target_buffer, 2)
     monthly_stop_loss_price = round(current_price - monthly_stop_buffer, 2)
@@ -216,7 +249,7 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         news_text += f"   *Latest Headline*: \"{news_headline}\"\n"
 
     ai_thesis = (
-        f"**Master Strategy Thesis for {stock.name} ({stock.symbol})**\n\n"
+        f"**Master Strategy Thesis for {stock.name} ({stock.symbol}) — [{horizon_title}]**\n\n"
         f"• **Smart Money Signal**: {smart_money['signal']} with ₹{smart_money['total_capital_crores']:,.0f} Cr "
         f"invested across {smart_money['total_funds_holding']} top-tier mutual funds.\n"
         f"• **Trading Books Consensus**: {book_eval['overall_score']}% score across Minervini, O'Neil CAN SLIM, "
@@ -226,10 +259,9 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         f"{news_text}"
         f"• **Technical Structure**: Price ₹{current_price:,.2f} relative to 50 EMA (₹{ema50:,.2f}) and 200 EMA (₹{ema200:,.2f}). "
         f"RSI is at {rsi:.1f} with MACD momentum positive.\n"
-        f"• **Disciplined 1:3 Risk Management**:\n"
-        f"   - 15-Day Swing: Risk ₹{stop_buffer:,.2f} (-{max_risk_pct}%) to make ₹{target_buffer:,.2f} (+{expected_return_pct}%).\n"
-        f"   - 30-Day Monthly: Target 🎯 ₹{monthly_target_price:,.2f} (+{monthly_expected_return_pct}%) | Trailing SL: ₹{monthly_stop_loss_price:,.2f}.\n"
-        f"   - **Strict 1:3 Risk-to-Reward Ratio maintained**."
+        f"• **Disciplined 1:3 Risk Management [{horizon_title}]**:\n"
+        f"   - Target: 🎯 ₹{target_price:,.2f} (+{expected_return_pct}%) | Stop-Loss: 🛑 ₹{stop_loss_price:,.2f} (-{max_risk_pct}%).\n"
+        f"   - Risk ₹{stop_buffer:,.2f} to make ₹{target_buffer:,.2f} (Strict 1:3 Risk-to-Reward Ratio)."
     )
 
     if earnings_warning:
@@ -238,13 +270,14 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     if lesson_notes:
         ai_thesis += f"\n\n🛡️ *Self-Learning Safeguard*: {' '.join(lesson_notes)}"
 
-    # 10. Ensure single active prediction per stock (expire older active predictions)
-    AIPrediction.objects.filter(stock=stock, status="ACTIVE").update(status="EXPIRED")
+    # 10. Ensure single active prediction per stock per timeframe (expire older active of this timeframe)
+    AIPrediction.objects.filter(stock=stock, timeframe_type=timeframe_type, status="ACTIVE").update(status="EXPIRED")
 
     # Create and Save Prediction
     prediction = AIPrediction.objects.create(
         stock=stock,
         prediction_date=today,
+        timeframe_type=timeframe_type,
         action=action,
         entry_price=round(current_price, 2),
         target_price=target_price,
@@ -252,7 +285,7 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         expected_return_pct=expected_return_pct,
         max_risk_pct=max_risk_pct,
         risk_reward_ratio=risk_reward_ratio,
-        timeframe_days=15,
+        timeframe_days=timeframe_days,
         monthly_target_price=monthly_target_price,
         monthly_expected_return_pct=monthly_expected_return_pct,
         monthly_stop_loss_price=monthly_stop_loss_price,
@@ -273,3 +306,17 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     )
 
     return prediction
+
+
+def generate_all_timeframe_predictions(stock: Stock, force_new: bool = False) -> dict:
+    """
+    Generates / Refreshes all 3 horizons (Daily, Weekly, Monthly) for a stock.
+    - Daily: verified next day (after 1 day).
+    - Weekly: verified weekly (5-day cycle).
+    - Monthly: verified monthly (20-day cycle).
+    """
+    return {
+        "DAILY": generate_ai_stock_prediction(stock, timeframe_type="DAILY", force_new=force_new),
+        "WEEKLY": generate_ai_stock_prediction(stock, timeframe_type="WEEKLY", force_new=force_new),
+        "MONTHLY": generate_ai_stock_prediction(stock, timeframe_type="MONTHLY", force_new=force_new),
+    }

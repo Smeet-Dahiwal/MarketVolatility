@@ -96,11 +96,17 @@ def send_telegram_alert(
             pb_val = f"{item.get('pb_ratio', 2.8):.1f}" if item.get('pb_ratio') else "—"
             news_lbl = item.get("news_sentiment", "NEUTRAL 🟡")
 
+            daily_tgt = f"₹{item.get('daily_target_price', 0):,.0f}" if item.get('daily_target_price') else tgt_15d
+            daily_sl = f"₹{item.get('daily_stop_loss_price', 0):,.0f}" if item.get('daily_stop_loss_price') else sl
+            weekly_tgt = f"₹{item.get('weekly_target_price', 0):,.0f}" if item.get('weekly_target_price') else tgt_15d
+            monthly_tgt = f"₹{item.get('monthly_target_price', 0):,.0f}" if item.get('monthly_target_price') else tgt_30d
+
             lines.append(
                 f"{idx}. {icon} <b>{sym}</b> · <b>{label}</b>\n"
-                f"   CMP: {curr} ➔ 🎯 <b>15D: {tgt_15d}</b> | 🗓️ <b>30D: {tgt_30d}</b>\n"
-                f"   🛡️ SL: {sl} (<b>RR: 1:3</b>) · News: {news_lbl}\n"
-                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · P/E: {pe_val} (P/B: {pb_val}x)"
+                f"   CMP: {curr} ➔ ⚡ <b>Next-Day: {daily_tgt}</b> (SL: {daily_sl})\n"
+                f"   📅 <b>Weekly: {weekly_tgt}</b> | 🗓️ <b>Monthly: {monthly_tgt}</b> [<b>RR: 1:3</b>]\n"
+                f"   📰 News: {news_lbl} · P/E: {pe_val} (P/B: {pb_val}x)\n"
+                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · Conf: {conf}%"
             )
     else:
         lines.append("")
@@ -113,7 +119,7 @@ def send_telegram_alert(
         for item in neutral_stocks:
             sym = item.get("symbol", "").replace(".NS", "")
             curr = f"₹{item.get('current_price', 0):,.0f}"
-            tgt = f"₹{item.get('target_price', 0):,.0f}"
+            tgt = f"₹{item.get('weekly_target_price', item.get('target_price', 0)):,.0f}"
             win_rate = item.get("win_rate", 60.0)
             pe_str = f"P/E {item.get('pe_ratio', 22):.0f}" if item.get('pe_ratio') else ""
             lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} ({pe_str} | Win: {win_rate:.0f}%)")
@@ -125,11 +131,12 @@ def send_telegram_alert(
         seen_resolved = set()
         for audit in newly_resolved_audits:
             pred = audit.prediction
-            sym = pred.stock.symbol.replace(".NS", "")
-            if sym in seen_resolved:
+            key = f"{pred.stock.symbol}_{pred.timeframe_type}_{audit.resolved_date}"
+            if key in seen_resolved:
                 continue
-            seen_resolved.add(sym)
+            seen_resolved.add(key)
 
+            sym = pred.stock.symbol.replace(".NS", "")
             is_win = audit.is_successful
             icon = "🎯" if is_win else "🛑"
             status_text = "TARGET HIT ✅" if is_win else "STOP-LOSS HIT ❌"
@@ -144,13 +151,15 @@ def send_telegram_alert(
             entry_price = f"₹{pred.entry_price:,.0f}"
             exit_price = f"₹{audit.exit_price or pred.target_price or 0:,.0f}" if is_win else f"₹{audit.exit_price or pred.stop_loss_price or 0:,.0f}"
 
+            tf_badge = "DAILY ⚡" if pred.timeframe_type == "DAILY" else ("WEEKLY 📅" if pred.timeframe_type == "WEEKLY" else "MONTHLY 🗓️")
+
             lines.append(
-                f"• {icon} <b>{sym}</b> — <b>{status_text} ({pnl_str})</b>\n"
+                f"• {icon} <b>{sym}</b> [{tf_badge}] — <b>{status_text} ({pnl_str})</b>\n"
                 f"  📅 <b>Called:</b> {pred_date_str} ➔ <b>Hit:</b> {hit_date_str} (Day {duration})\n"
                 f"  💰 Entry: {entry_price} | Exit: {exit_price} | RR: 1:3"
             )
     else:
-        lines.append("• <i>No calls hit target or stop-loss today (all 19 active positions monitored).</i>")
+        lines.append("• <i>No calls hit target or stop-loss today (all active positions monitored).</i>")
 
     lines.append("")
     lines.append("⚡ <i>BullGuard AI · Automated Market Engine</i>")

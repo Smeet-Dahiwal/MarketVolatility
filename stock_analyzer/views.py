@@ -194,6 +194,12 @@ def predictions_ledger_view(request):
     # Resolved predictions with audits
     resolved_predictions = AIPrediction.objects.exclude(status="ACTIVE").select_related("stock", "audit")
 
+    # Optional Timeframe Filter (Daily, Weekly, Monthly)
+    tf_filter = request.GET.get("timeframe", "").upper()
+    if tf_filter in ["DAILY", "WEEKLY", "MONTHLY"]:
+        active_predictions = active_predictions.filter(timeframe_type=tf_filter)
+        resolved_predictions = resolved_predictions.filter(timeframe_type=tf_filter)
+
     # Metrics
     total_completed = resolved_predictions.count()
     total_wins = resolved_predictions.filter(status="TARGET_HIT").count()

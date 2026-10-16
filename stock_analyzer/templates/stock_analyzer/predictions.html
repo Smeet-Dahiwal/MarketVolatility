@@ -88,6 +88,7 @@
       <thead>
         <tr>
           <th>Stock</th>
+          <th>Horizon</th>
           <th>Prediction Date</th>
           <th>Action</th>
           <th>Entry Price</th>
@@ -106,6 +107,11 @@
               {{ pred.stock.symbol }}
             </a>
             <div style="font-size: 0.75rem; color: var(--text-dim);">{{ pred.stock.name }}</div>
+          </td>
+          <td>
+            <span class="badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 0.75rem; font-weight: 600;">
+              {{ pred.get_timeframe_type_display|default:pred.timeframe_type }}
+            </span>
           </td>
           <td style="color: var(--text-muted); font-size: 0.85rem;">{{ pred.prediction_date }}</td>
           <td>

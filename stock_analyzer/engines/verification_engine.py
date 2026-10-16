@@ -38,14 +38,21 @@ def run_daily_verification_audit():
             continue
 
         resolved = False
+        tf_type = getattr(pred, "timeframe_type", "DAILY") or "DAILY"
+        tf_days = pred.timeframe_days or (1 if tf_type == "DAILY" else (5 if tf_type == "WEEKLY" else 20))
+
         for bar in price_bars:
-            days_active = max((bar.date - pred.prediction_date).days, 1)
+            days_active = (bar.date - pred.prediction_date).days
+
+            # Next-day prediction is tested on the next day session (bar.date > pred.prediction_date)
+            # If it's the exact same day of creation, only check if price immediately hit target or stop-loss
+            is_same_day = (bar.date == pred.prediction_date)
 
             # Case 1: Target Reached (WIN)
             if bar.high_price >= pred.target_price:
                 pred.status = "TARGET_HIT"
                 pred.resolved_date = bar.date
-                pred.resolution_day = days_active
+                pred.resolution_day = max(days_active, 1)
                 pred.exit_price = pred.target_price
                 pnl = round(((pred.target_price - pred.entry_price) / pred.entry_price) * 100, 2)
                 pred.pnl_percentage = pnl
@@ -61,11 +68,11 @@ def run_daily_verification_audit():
                         "exit_price": pred.target_price,
                         "pnl_percentage": pnl,
                         "is_successful": True,
-                        "duration_days": days_active,
-                        "root_cause_category": "None - Target Hit (High Conviction Win)",
-                        "what_went_wrong_analysis": f"Target reached on Day {days_active} (Called: {pred.prediction_date}, Hit: {bar.date}). Trade executed perfectly according to Minervini Trend Template and Institutional Inflow momentum.",
-                        "ai_lesson_learned": "High Mutual Fund concentration + Stage 2 base breakout remains the highest statistical probability setup.",
-                        "system_weight_adjustment": "Increased Smart Money weight (+2%) and Minervini Trend weight (+1%)."
+                        "duration_days": max(days_active, 1),
+                        "root_cause_category": f"None - Target Hit ([{tf_type}] Win)",
+                        "what_went_wrong_analysis": f"[{tf_type}] Target reached on Day {max(days_active, 1)} (Called: {pred.prediction_date}, Hit: {bar.date}). Trade executed according to Minervini Trend and Smart Money momentum.",
+                        "ai_lesson_learned": f"[{tf_type}] High institutional backing + Stage 2 breakout delivered asymmetric 1:3 return.",
+                        "system_weight_adjustment": "Reinforced successful strategy weight."
                     }
                 )
                 if bar.date == today:
@@ -77,7 +84,7 @@ def run_daily_verification_audit():
             elif bar.low_price <= pred.stop_loss_price:
                 pred.status = "STOP_LOSS_HIT"
                 pred.resolved_date = bar.date
-                pred.resolution_day = days_active
+                pred.resolution_day = max(days_active, 1)
                 pred.exit_price = pred.stop_loss_price
                 pnl = round(((pred.stop_loss_price - pred.entry_price) / pred.entry_price) * 100, 2)
                 pred.pnl_percentage = pnl
@@ -87,12 +94,12 @@ def run_daily_verification_audit():
                     stop_losses_hit_today += 1
 
                 # Execute automated Post-Mortem Diagnostic & Book Re-Audit
-                audit_data = execute_post_mortem_analysis(pred, bar, days_active, pnl)
+                audit_data = execute_post_mortem_analysis(pred, bar, max(days_active, 1), pnl)
                 audit_data["resolved_date"] = bar.date
                 audit_data["exit_price"] = pred.stop_loss_price
                 audit_data["pnl_percentage"] = pnl
-                audit_data["duration_days"] = days_active
-                audit_data["what_went_wrong_analysis"] = f"Stop-loss hit on Day {days_active} (Called: {pred.prediction_date}, Hit: {bar.date}). " + audit_data.get("what_went_wrong_analysis", "")
+                audit_data["duration_days"] = max(days_active, 1)
+                audit_data["what_went_wrong_analysis"] = f"[{tf_type}] Stop-loss hit on Day {max(days_active, 1)} (Called: {pred.prediction_date}, Hit: {bar.date}). " + audit_data.get("what_went_wrong_analysis", "")
 
                 audit, _ = PredictionAudit.objects.update_or_create(
                     prediction=pred,
@@ -103,8 +110,11 @@ def run_daily_verification_audit():
                 resolved = True
                 break
 
-            # Case 3: Time Horizon Expired
-            elif days_active >= pred.timeframe_days:
+            # Case 3: Time Horizon Expired / Completed at Close of Cycle
+            # - DAILY: Expired/Completed after 1 day (on next day bar)
+            # - WEEKLY: Expired/Completed after 5 trading days
+            # - MONTHLY: Expired/Completed after 20 trading days
+            elif days_active >= tf_days and not is_same_day:
                 pred.status = "EXPIRED"
                 pred.resolved_date = bar.date
                 pred.resolution_day = days_active
@@ -122,10 +132,10 @@ def run_daily_verification_audit():
                         "pnl_percentage": pnl,
                         "is_successful": is_win,
                         "duration_days": days_active,
-                        "root_cause_category": "Time Horizon Expired (Sideways Consolidation)",
-                        "what_went_wrong_analysis": f"Stock moved in a tight range without decisive breakout (Net P&L: {pnl:+.2f}%).",
-                        "ai_lesson_learned": "Check for upcoming quarterly earnings announcements that might cause institutional indecision before entering.",
-                        "system_weight_adjustment": "Tightened ATR entry filter to avoid entering during extended base range."
+                        "root_cause_category": f"[{tf_type}] Cycle Completed",
+                        "what_went_wrong_analysis": f"[{tf_type}] Trade completed its {tf_days}-day horizon with net return of {pnl:+.2f}%.",
+                        "ai_lesson_learned": f"[{tf_type}] Completed verification cycle.",
+                        "system_weight_adjustment": "Cycle updated."
                     }
                 )
                 if bar.date == today:

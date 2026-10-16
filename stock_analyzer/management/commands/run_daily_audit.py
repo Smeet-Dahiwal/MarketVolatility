@@ -42,18 +42,18 @@ class Command(BaseCommand):
         self.stdout.write("Running verification audit on active predictions...")
         audit_res = run_daily_verification_audit()
 
-        # 4. Generate/Refresh AI Predictions for Stocks Needing New Trade Cycles
-        self.stdout.write("Checking if any stocks need new prediction trade cycles...")
+        # 4. Generate/Refresh AI Predictions for All 3 Timeframes (Daily, Weekly, Monthly)
+        self.stdout.write("Checking active predictions for Daily, Weekly, and Monthly cycles...")
         new_preds_count = 0
         for stock in stocks:
-            # If stock's previous trade resolved (or hasn't started), generate fresh forecast
-            if not AIPrediction.objects.filter(stock=stock, status="ACTIVE").exists():
-                try:
-                    generate_ai_stock_prediction(stock)
-                    new_preds_count += 1
-                except Exception as e:
-                    self.stdout.write(self.style.WARNING(f"  Warning generating prediction for {stock.symbol}: {e}"))
-        self.stdout.write(f"Generated {new_preds_count} fresh trade cycles.")
+            for tf in ["DAILY", "WEEKLY", "MONTHLY"]:
+                if not AIPrediction.objects.filter(stock=stock, timeframe_type=tf, status="ACTIVE").exists():
+                    try:
+                        generate_ai_stock_prediction(stock, timeframe_type=tf)
+                        new_preds_count += 1
+                    except Exception as e:
+                        self.stdout.write(self.style.WARNING(f"  Warning generating {tf} prediction for {stock.symbol}: {e}"))
+        self.stdout.write(f"Generated/Refreshed {new_preds_count} timeframe trade cycles.")
 
         # 5. Output Summary & Save JSON Artifact
         latest_log = DailyVerificationLog.objects.first()
@@ -80,34 +80,46 @@ class Command(BaseCommand):
         with open("audit_summary.json", "w") as f:
             json.dump(summary, f, indent=2)
 
-        # 6. Build Detailed Per-Stock Prediction & Win Rate Records
+        # 6. Build Detailed Per-Stock Prediction Records (Daily, Weekly, Monthly)
         stock_items = []
         for stock in stocks:
-            latest_pred = AIPrediction.objects.filter(stock=stock, status="ACTIVE").order_by("-prediction_date", "-id").first()
-            if not latest_pred:
-                latest_pred = AIPrediction.objects.filter(stock=stock).order_by("-prediction_date", "-id").first()
-            
+            daily_pred = AIPrediction.objects.filter(stock=stock, timeframe_type="DAILY", status="ACTIVE").order_by("-prediction_date", "-id").first()
+            weekly_pred = AIPrediction.objects.filter(stock=stock, timeframe_type="WEEKLY", status="ACTIVE").order_by("-prediction_date", "-id").first()
+            monthly_pred = AIPrediction.objects.filter(stock=stock, timeframe_type="MONTHLY", status="ACTIVE").order_by("-prediction_date", "-id").first()
+
+            primary_pred = daily_pred or weekly_pred or monthly_pred
+
             audits = PredictionAudit.objects.filter(prediction__stock=stock)
             s_wins = audits.filter(is_successful=True).count()
             s_total = audits.count()
-            s_win_rate = round((s_wins / s_total * 100), 1) if s_total > 0 else round(float(latest_pred.confidence_score if latest_pred else 72.0), 1)
+            s_win_rate = round((s_wins / s_total * 100), 1) if s_total > 0 else round(float(primary_pred.confidence_score if primary_pred else 72.0), 1)
 
             stock_items.append({
                 "symbol": stock.symbol,
                 "name": stock.name,
-                "action": latest_pred.action if latest_pred else "HOLD",
-                "action_label": latest_pred.get_action_display() if latest_pred else "HOLD / WAIT 🟡",
+                "action": primary_pred.action if primary_pred else "HOLD",
+                "action_label": primary_pred.get_action_display() if primary_pred else "HOLD / WAIT 🟡",
                 "current_price": stock.current_price,
-                "target_price": latest_pred.target_price if latest_pred else None,
-                "stop_loss_price": latest_pred.stop_loss_price if latest_pred else None,
-                "monthly_target_price": latest_pred.monthly_target_price if latest_pred else None,
-                "monthly_expected_return_pct": latest_pred.monthly_expected_return_pct if latest_pred else None,
-                "risk_reward_ratio": latest_pred.risk_reward_ratio if latest_pred else 3.0,
+                # Next-Day (Daily)
+                "daily_target_price": daily_pred.target_price if daily_pred else None,
+                "daily_stop_loss_price": daily_pred.stop_loss_price if daily_pred else None,
+                "daily_expected_return_pct": daily_pred.expected_return_pct if daily_pred else None,
+                # Weekly (Swing)
+                "target_price": weekly_pred.target_price if weekly_pred else (daily_pred.target_price if daily_pred else None),
+                "stop_loss_price": weekly_pred.stop_loss_price if weekly_pred else (daily_pred.stop_loss_price if daily_pred else None),
+                "weekly_target_price": weekly_pred.target_price if weekly_pred else None,
+                "weekly_stop_loss_price": weekly_pred.stop_loss_price if weekly_pred else None,
+                "weekly_expected_return_pct": weekly_pred.expected_return_pct if weekly_pred else None,
+                # Monthly (Position)
+                "monthly_target_price": monthly_pred.target_price if monthly_pred else (primary_pred.monthly_target_price if primary_pred else None),
+                "monthly_stop_loss_price": monthly_pred.stop_loss_price if monthly_pred else (primary_pred.monthly_stop_loss_price if primary_pred else None),
+                "monthly_expected_return_pct": monthly_pred.expected_return_pct if monthly_pred else (primary_pred.monthly_expected_return_pct if primary_pred else None),
+                "risk_reward_ratio": 3.0,
                 "pe_ratio": stock.pe_ratio,
                 "pb_ratio": stock.pb_ratio,
                 "book_value": stock.book_value,
                 "news_sentiment": stock.news_sentiment_label,
-                "confidence_score": latest_pred.confidence_score if latest_pred else 75,
+                "confidence_score": primary_pred.confidence_score if primary_pred else 75,
                 "win_rate": s_win_rate,
                 "trades_count": s_total
             })

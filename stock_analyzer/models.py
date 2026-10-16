@@ -157,8 +157,15 @@ class AIPrediction(models.Model):
         ("EXPIRED", "Expired ⏱️"),
     ]
 
+    TIMEFRAME_CHOICES = [
+        ("DAILY", "Next-Day (Daily) ⚡"),
+        ("WEEKLY", "Weekly (Swing) 📅"),
+        ("MONTHLY", "Monthly (Position) 🗓️"),
+    ]
+
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE, related_name="predictions")
     prediction_date = models.DateField(db_index=True)
+    timeframe_type = models.CharField(max_length=20, choices=TIMEFRAME_CHOICES, default="DAILY", db_index=True)
     action = models.CharField(max_length=30, choices=ACTION_CHOICES, default="STRONG_BUY")
     entry_price = models.FloatField()
     target_price = models.FloatField()
@@ -166,7 +173,7 @@ class AIPrediction(models.Model):
     expected_return_pct = models.FloatField()
     max_risk_pct = models.FloatField()
     risk_reward_ratio = models.FloatField(default=3.0) # Disciplined 1:3 Risk-to-Reward Ratio
-    timeframe_days = models.IntegerField(default=15)
+    timeframe_days = models.IntegerField(default=1) # 1 for Daily, 5 for Weekly, 20 for Monthly
     
     # 30-Day Monthly Target Horizons
     monthly_target_price = models.FloatField(null=True, blank=True)
