@@ -25,9 +25,10 @@ def run_daily_verification_audit():
     
     targets_hit_today = 0
     stop_losses_hit_today = 0
+    resolved_today_audits = []
 
     for pred in active_predictions:
-        # Get latest price bars after prediction date
+        # Get price bars after or on prediction date, ordered chronologically
         price_bars = DailyPriceData.objects.filter(
             stock=pred.stock,
             date__gte=pred.prediction_date
@@ -36,72 +37,101 @@ def run_daily_verification_audit():
         if not price_bars.exists():
             continue
 
-        highest_reached = max(p.high_price for p in price_bars)
-        lowest_reached = min(p.low_price for p in price_bars)
-        latest_bar = price_bars.last()
-        latest_close = latest_bar.close_price
-        days_active = (latest_bar.date - pred.prediction_date).days
+        resolved = False
+        for bar in price_bars:
+            days_active = max((bar.date - pred.prediction_date).days, 1)
 
-        # Case 1: Target Reached (WIN)
-        if highest_reached >= pred.target_price:
-            pred.status = "TARGET_HIT"
-            pred.save()
-            targets_hit_today += 1
+            # Case 1: Target Reached (WIN)
+            if bar.high_price >= pred.target_price:
+                pred.status = "TARGET_HIT"
+                pred.resolved_date = bar.date
+                pred.resolution_day = days_active
+                pred.exit_price = pred.target_price
+                pnl = round(((pred.target_price - pred.entry_price) / pred.entry_price) * 100, 2)
+                pred.pnl_percentage = pnl
+                pred.save()
 
-            pnl = round(((pred.target_price - pred.entry_price) / pred.entry_price) * 100, 2)
-            PredictionAudit.objects.update_or_create(
-                prediction=pred,
-                defaults={
-                    "resolved_date": latest_bar.date,
-                    "exit_price": pred.target_price,
-                    "pnl_percentage": pnl,
-                    "is_successful": True,
-                    "duration_days": days_active,
-                    "root_cause_category": "None - Target Hit (High Conviction Win)",
-                    "what_went_wrong_analysis": "Trade executed perfectly according to Minervini Trend Template and Institutional Inflow momentum.",
-                    "ai_lesson_learned": "High Mutual Fund concentration + Stage 2 base breakout remains the highest statistical probability setup.",
-                    "system_weight_adjustment": "Increased Smart Money weight (+2%) and Minervini Trend weight (+1%)."
-                }
-            )
+                if bar.date == today:
+                    targets_hit_today += 1
 
-        # Case 2: Stop-Loss Triggered (LOSS -> Post-Mortem Required)
-        elif lowest_reached <= pred.stop_loss_price:
-            pred.status = "STOP_LOSS_HIT"
-            pred.save()
-            stop_losses_hit_today += 1
+                audit, _ = PredictionAudit.objects.update_or_create(
+                    prediction=pred,
+                    defaults={
+                        "resolved_date": bar.date,
+                        "exit_price": pred.target_price,
+                        "pnl_percentage": pnl,
+                        "is_successful": True,
+                        "duration_days": days_active,
+                        "root_cause_category": "None - Target Hit (High Conviction Win)",
+                        "what_went_wrong_analysis": f"Target reached on Day {days_active} (Called: {pred.prediction_date}, Hit: {bar.date}). Trade executed perfectly according to Minervini Trend Template and Institutional Inflow momentum.",
+                        "ai_lesson_learned": "High Mutual Fund concentration + Stage 2 base breakout remains the highest statistical probability setup.",
+                        "system_weight_adjustment": "Increased Smart Money weight (+2%) and Minervini Trend weight (+1%)."
+                    }
+                )
+                if bar.date == today:
+                    resolved_today_audits.append(audit)
+                resolved = True
+                break
 
-            pnl = round(((pred.stop_loss_price - pred.entry_price) / pred.entry_price) * 100, 2)
-            
-            # Execute automated Post-Mortem Diagnostic & Book Re-Audit
-            audit_data = execute_post_mortem_analysis(pred, latest_bar, days_active, pnl)
-            
-            PredictionAudit.objects.update_or_create(
-                prediction=pred,
-                defaults=audit_data
-            )
+            # Case 2: Stop-Loss Triggered (LOSS -> Post-Mortem Required)
+            elif bar.low_price <= pred.stop_loss_price:
+                pred.status = "STOP_LOSS_HIT"
+                pred.resolved_date = bar.date
+                pred.resolution_day = days_active
+                pred.exit_price = pred.stop_loss_price
+                pnl = round(((pred.stop_loss_price - pred.entry_price) / pred.entry_price) * 100, 2)
+                pred.pnl_percentage = pnl
+                pred.save()
 
-        # Case 3: Time Horizon Expired
-        elif days_active >= pred.timeframe_days:
-            pred.status = "EXPIRED"
-            pred.save()
+                if bar.date == today:
+                    stop_losses_hit_today += 1
 
-            pnl = round(((latest_close - pred.entry_price) / pred.entry_price) * 100, 2)
-            is_win = pnl > 0
+                # Execute automated Post-Mortem Diagnostic & Book Re-Audit
+                audit_data = execute_post_mortem_analysis(pred, bar, days_active, pnl)
+                audit_data["resolved_date"] = bar.date
+                audit_data["exit_price"] = pred.stop_loss_price
+                audit_data["pnl_percentage"] = pnl
+                audit_data["duration_days"] = days_active
+                audit_data["what_went_wrong_analysis"] = f"Stop-loss hit on Day {days_active} (Called: {pred.prediction_date}, Hit: {bar.date}). " + audit_data.get("what_went_wrong_analysis", "")
 
-            PredictionAudit.objects.update_or_create(
-                prediction=pred,
-                defaults={
-                    "resolved_date": latest_bar.date,
-                    "exit_price": latest_close,
-                    "pnl_percentage": pnl,
-                    "is_successful": is_win,
-                    "duration_days": days_active,
-                    "root_cause_category": "Time Horizon Expired (Sideways Consolidation)",
-                    "what_went_wrong_analysis": f"Stock moved in a tight range without decisive breakout (Net P&L: {pnl:+.2f}%).",
-                    "ai_lesson_learned": "Check for upcoming quarterly earnings announcements that might cause institutional indecision before entering.",
-                    "system_weight_adjustment": "Tightened ATR entry filter to avoid entering during extended base range."
-                }
-            )
+                audit, _ = PredictionAudit.objects.update_or_create(
+                    prediction=pred,
+                    defaults=audit_data
+                )
+                if bar.date == today:
+                    resolved_today_audits.append(audit)
+                resolved = True
+                break
+
+            # Case 3: Time Horizon Expired
+            elif days_active >= pred.timeframe_days:
+                pred.status = "EXPIRED"
+                pred.resolved_date = bar.date
+                pred.resolution_day = days_active
+                pred.exit_price = bar.close_price
+                pnl = round(((bar.close_price - pred.entry_price) / pred.entry_price) * 100, 2)
+                pred.pnl_percentage = pnl
+                pred.save()
+
+                is_win = pnl > 0
+                audit, _ = PredictionAudit.objects.update_or_create(
+                    prediction=pred,
+                    defaults={
+                        "resolved_date": bar.date,
+                        "exit_price": bar.close_price,
+                        "pnl_percentage": pnl,
+                        "is_successful": is_win,
+                        "duration_days": days_active,
+                        "root_cause_category": "Time Horizon Expired (Sideways Consolidation)",
+                        "what_went_wrong_analysis": f"Stock moved in a tight range without decisive breakout (Net P&L: {pnl:+.2f}%).",
+                        "ai_lesson_learned": "Check for upcoming quarterly earnings announcements that might cause institutional indecision before entering.",
+                        "system_weight_adjustment": "Tightened ATR entry filter to avoid entering during extended base range."
+                    }
+                )
+                if bar.date == today:
+                    resolved_today_audits.append(audit)
+                resolved = True
+                break
 
     # Compute overall ledger stats
     total_completed = AIPrediction.objects.exclude(status="ACTIVE").count()
@@ -127,7 +157,8 @@ def run_daily_verification_audit():
         "stop_losses_hit_today": stop_losses_hit_today,
         "total_active": AIPrediction.objects.filter(status="ACTIVE").count(),
         "win_rate_pct": win_rate,
-        "total_completed": total_completed
+        "total_completed": total_completed,
+        "resolved_today_audits": resolved_today_audits
     }
 
 
@@ -257,7 +288,11 @@ def seed_sample_predictions_and_audits():
             fundamental_score=90,
             smart_money_score=92,
             book_rules_score=88,
-            status="TARGET_HIT"
+            status="TARGET_HIT",
+            resolved_date=today - datetime.timedelta(days=3),
+            resolution_day=9,
+            exit_price=target,
+            pnl_percentage=exp_ret
         )
         PredictionAudit.objects.create(
             prediction=p,
@@ -302,7 +337,11 @@ def seed_sample_predictions_and_audits():
             fundamental_score=80,
             smart_money_score=75,
             book_rules_score=74,
-            status="STOP_LOSS_HIT"
+            status="STOP_LOSS_HIT",
+            resolved_date=today - datetime.timedelta(days=11),
+            resolution_day=7,
+            exit_price=sl,
+            pnl_percentage=pnl
         )
         PredictionAudit.objects.create(
             prediction=p,
@@ -352,7 +391,11 @@ def seed_sample_predictions_and_audits():
             fundamental_score=86,
             smart_money_score=95,
             book_rules_score=91,
-            status="TARGET_HIT"
+            status="TARGET_HIT",
+            resolved_date=today - datetime.timedelta(days=8),
+            resolution_day=12,
+            exit_price=target,
+            pnl_percentage=exp_ret
         )
         PredictionAudit.objects.create(
             prediction=p,

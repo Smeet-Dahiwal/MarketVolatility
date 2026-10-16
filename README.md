@@ -251,6 +251,15 @@ The entire system runs **100% free and automated** using GitHub Actions:
 • 🟡 HDFCBANK: ₹700 ➔ Tgt ₹766 (Win: 61%)
 • 🟡 TCS: ₹2,128 ➔ Tgt ₹2,328 (Win: 75%)
 ...
+
+🔔 TRADES RESOLVED TODAY:
+• 🎯 INFY — TARGET HIT ✅ (+8.6%)
+  📅 Called: 10-Oct ➔ Hit: 14-Oct (Day 4)
+  💰 Entry: ₹1,012 | Exit: ₹1,099 | RR: 1:3
+
+• 🛑 TCS — STOP-LOSS HIT ❌ (-2.8%)
+  📅 Called: 11-Oct ➔ Hit: 14-Oct (Day 3)
+  💰 Entry: ₹2,128 | Exit: ₹2,068 | Post-Mortem Logged
 ```
 
 ---

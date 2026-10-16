@@ -193,6 +193,13 @@ class AIPrediction(models.Model):
     book_rules_score = models.IntegerField(default=85)
     
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="ACTIVE", db_index=True)
+    
+    # Resolution Tracking (Exact day target or stop-loss was hit)
+    resolved_date = models.DateField(null=True, blank=True, db_index=True)
+    resolution_day = models.IntegerField(null=True, blank=True) # Holding day number when hit (e.g., Day 4)
+    exit_price = models.FloatField(null=True, blank=True)
+    pnl_percentage = models.FloatField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

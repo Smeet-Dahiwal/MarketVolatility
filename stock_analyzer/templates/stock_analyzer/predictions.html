@@ -162,12 +162,12 @@
       <thead>
         <tr>
           <th>Stock</th>
-          <th>Prediction Date</th>
+          <th>Called Date</th>
+          <th>Hit Date (Day)</th>
           <th>Outcome Status</th>
           <th>Entry Price</th>
           <th>Exit Price</th>
           <th>Realized Return (P&L)</th>
-          <th>Duration</th>
           <th>Post-Mortem Diagnostic</th>
         </tr>
       </thead>
@@ -181,6 +181,10 @@
             <div style="font-size: 0.75rem; color: var(--text-dim);">{{ pred.stock.name }}</div>
           </td>
           <td style="color: var(--text-muted); font-size: 0.85rem;">{{ pred.prediction_date }}</td>
+          <td style="color: var(--text-light); font-size: 0.85rem;">
+            <b>{{ pred.resolved_date|default:pred.audit.resolved_date|default:pred.prediction_date }}</b>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">Day {{ pred.resolution_day|default:pred.audit.duration_days|default:1 }}</div>
+          </td>
           <td>
             {% if pred.status == 'TARGET_HIT' %}
             <span class="badge badge-win">🎯 TARGET HIT</span>
@@ -192,13 +196,12 @@
           </td>
           <td style="font-family: var(--font-mono);">₹{{ pred.entry_price|floatformat:1 }}</td>
           <td style="font-family: var(--font-mono); font-weight: 700; color: #fff;">
-            ₹{{ pred.audit.exit_price|default:pred.target_price|floatformat:1 }}
+            ₹{{ pred.exit_price|default:pred.audit.exit_price|default:pred.target_price|floatformat:1 }}
           </td>
-          <td style="font-family: var(--font-mono); font-weight: 800; {% if pred.audit.pnl_percentage >= 0 %}color: var(--accent-green);{% else %}color: var(--accent-rose);{% endif %}">
-            {% if pred.audit.pnl_percentage >= 0 %}+{% endif %}{{ pred.audit.pnl_percentage|floatformat:2 }}%
-          </td>
-          <td style="color: var(--text-muted); font-size: 0.85rem;">
-            {{ pred.audit.duration_days|default:10 }} Days
+          <td style="font-family: var(--font-mono); font-weight: 800; {% if pred.pnl_percentage >= 0 or pred.audit.pnl_percentage >= 0 %}color: var(--accent-green);{% else %}color: var(--accent-rose);{% endif %}">
+            {% with pnl=pred.pnl_percentage|default:pred.audit.pnl_percentage %}
+            {% if pnl >= 0 %}+{% endif %}{{ pnl|floatformat:2 }}%
+            {% endwith %}
           </td>
           <td>
             {% if pred.audit %}

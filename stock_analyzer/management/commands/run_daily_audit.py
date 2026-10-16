@@ -114,8 +114,12 @@ class Command(BaseCommand):
 
         # 7. Dispatch Comprehensive Telegram Alert
         today_date = timezone.now().date()
-        today_audits = PredictionAudit.objects.filter(resolved_date=today_date)
-        telegram_sent = send_telegram_alert(summary, stock_items=stock_items, newly_resolved_audits=list(today_audits))
+        today_audits = list(audit_res.get("resolved_today_audits", []))
+        for audit in PredictionAudit.objects.filter(resolved_date=today_date).select_related("prediction__stock"):
+            if not any(x.id == audit.id for x in today_audits):
+                today_audits.append(audit)
+
+        telegram_sent = send_telegram_alert(summary, stock_items=stock_items, newly_resolved_audits=today_audits)
         if telegram_sent:
             self.stdout.write(self.style.SUCCESS("  Dispatched Telegram notification alert for all stocks to your group!"))
         else:

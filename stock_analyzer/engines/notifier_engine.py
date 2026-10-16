@@ -118,19 +118,39 @@ def send_telegram_alert(
             pe_str = f"P/E {item.get('pe_ratio', 22):.0f}" if item.get('pe_ratio') else ""
             lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} ({pe_str} | Win: {win_rate:.0f}%)")
 
-    # 3. Resolved Audits Today (Deduplicated per stock symbol)
+    # 3. Resolved Audits Today (Which day prediction was made, which day target/stop loss was hit)
+    lines.append("")
+    lines.append("🔔 <b>TRADES RESOLVED TODAY:</b>")
     if newly_resolved_audits:
-        lines.append("")
-        lines.append("🔔 <b>TRADES RESOLVED TODAY:</b>")
         seen_resolved = set()
         for audit in newly_resolved_audits:
-            sym = audit.prediction.stock.symbol.replace(".NS", "")
+            pred = audit.prediction
+            sym = pred.stock.symbol.replace(".NS", "")
             if sym in seen_resolved:
                 continue
             seen_resolved.add(sym)
-            outcome = "Target Hit 🎯" if audit.is_successful else "Stop-Loss 🛑"
-            pnl = f"{audit.pnl_percentage:+.1f}%" if audit.pnl_percentage is not None else "0%"
-            lines.append(f"• <b>{sym}</b>: {outcome} ({pnl})")
+
+            is_win = audit.is_successful
+            icon = "🎯" if is_win else "🛑"
+            status_text = "TARGET HIT ✅" if is_win else "STOP-LOSS HIT ❌"
+            pnl_val = audit.pnl_percentage if audit.pnl_percentage is not None else (pred.expected_return_pct if is_win else -pred.max_risk_pct)
+            pnl_str = f"{pnl_val:+.1f}%"
+
+            # Days & dates
+            pred_date_str = pred.prediction_date.strftime("%d-%b") if pred.prediction_date else "Earlier"
+            hit_date_str = audit.resolved_date.strftime("%d-%b") if audit.resolved_date else "Today"
+            duration = audit.duration_days or pred.resolution_day or 1
+
+            entry_price = f"₹{pred.entry_price:,.0f}"
+            exit_price = f"₹{audit.exit_price or pred.target_price or 0:,.0f}" if is_win else f"₹{audit.exit_price or pred.stop_loss_price or 0:,.0f}"
+
+            lines.append(
+                f"• {icon} <b>{sym}</b> — <b>{status_text} ({pnl_str})</b>\n"
+                f"  📅 <b>Called:</b> {pred_date_str} ➔ <b>Hit:</b> {hit_date_str} (Day {duration})\n"
+                f"  💰 Entry: {entry_price} | Exit: {exit_price} | RR: 1:3"
+            )
+    else:
+        lines.append("• <i>No calls hit target or stop-loss today (all 19 active positions monitored).</i>")
 
     lines.append("")
     lines.append("⚡ <i>BullGuard AI · Automated Market Engine</i>")
