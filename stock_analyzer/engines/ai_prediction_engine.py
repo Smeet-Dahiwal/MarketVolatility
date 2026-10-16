@@ -68,26 +68,59 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
 
     technical_score = max(min(int(tech_score), 98), 15)
 
-    # 4. Calculate Fundamental Score (0 - 100)
+    # 4. Calculate Fundamental Score with Book Value & P/E Ratio (0 - 100)
     fund_score = 50
     if stock.market_cap_crores > 50000:
-        fund_score += 15  # High liquidity large cap stability
+        fund_score += 10  # High liquidity large cap stability
     elif stock.market_cap_crores > 15000:
-        fund_score += 10
+        fund_score += 6
 
     pe = stock.pe_ratio or 22.0
-    if pe < 25:
-        fund_score += 15
-    elif pe > 45:
+    ind_pe = stock.industry_pe or 25.0
+    eps_growth = stock.eps_growth_yoy or 12.0
+    pb = stock.pb_ratio or 2.8
+    book_val = stock.book_value or (stock.current_price / pb if pb else 100.0)
+    roe = stock.roe_pct or 15.0
+
+    # P/E Ratio Evaluation vs Industry Peers & Growth
+    if pe < ind_pe and eps_growth >= 12.0:
+        fund_score += 15  # Attractive valuation discount with strong earnings growth
+    elif pe < ind_pe:
+        fund_score += 8
+    elif pe > (ind_pe * 1.8) and eps_growth < 10.0:
+        fund_score -= 14  # High valuation penalty without matching growth
+    elif pe > 50:
+        fund_score -= 8
+
+    # Book Value & P/B Ratio Evaluation
+    if pb < 3.0 and roe >= 15.0:
+        fund_score += 12  # Strong asset backing + high return on equity
+    elif pb < 5.0 and roe >= 18.0:
+        fund_score += 8
+    elif pb > 14.0 and eps_growth < 10.0:
+        fund_score -= 10  # Asset overvaluation trap
+
+    if roe > 18.0:
+        fund_score += 8
+    elif roe < 8.0:
         fund_score -= 10
 
-    roe = stock.roe_pct or 15.0
-    if roe > 15:
-        fund_score += 10
+    debt_eq = stock.debt_to_equity or 0.5
+    if debt_eq < 0.5:
+        fund_score += 8  # Pristine balance sheet / low leverage
+    elif debt_eq > 1.8:
+        fund_score -= 12  # Overleveraged debt risk
 
-    fundamental_score = max(min(int(fund_score), 98), 20)
+    fundamental_score = max(min(int(fund_score), 98), 15)
 
-    # 5. Database Lesson Memory (Check past failed predictions for this stock/sector)
+    # 5. Real-Time News Trading & Sentiment Impact
+    news_sentiment_score = stock.news_sentiment_score if stock.news_sentiment_score is not None else 0.0
+    news_label = stock.news_sentiment_label or "NEUTRAL 🟡"
+    news_headline = stock.latest_news_headline or ""
+    news_score = int(50 + (news_sentiment_score * 40)) # Normalized 10 to 90
+    news_score = max(min(news_score, 95), 10)
+
+    # 6. Database Lesson Memory (Check past failed predictions for this stock/sector)
     past_lessons = PredictionAudit.objects.filter(
         prediction__stock__sector=stock.sector,
         is_successful=False
@@ -102,46 +135,64 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         elif "Volume" in past.root_cause_category:
             lesson_penalty += 5
 
-    # 6. Composite Score & Action Decision
-    # Weights: Smart Money (35%), Book Rules (30%), Technicals (20%), Fundamentals (15%)
+    # 7. Composite Score & Action Decision
+    # Weights: Smart Money (30%), Book Rules (25%), Technicals (20%), Fundamentals (15%), News Trading (10%)
     raw_composite = (
-        (smart_money_score * 0.35) +
-        (book_rules_score * 0.30) +
+        (smart_money_score * 0.30) +
+        (book_rules_score * 0.25) +
         (technical_score * 0.20) +
-        (fundamental_score * 0.15)
+        (fundamental_score * 0.15) +
+        (news_score * 0.10)
     ) - lesson_penalty
 
-    confidence_score = max(min(int(raw_composite), 95), 25)
+    # News Sentiment Boost or Penalty
+    if news_sentiment_score >= 0.25:
+        raw_composite += 6  # Good News tailwind
+    elif news_sentiment_score <= -0.25:
+        raw_composite -= 14 # Bad News headwind
 
-    # Action Matrix
-    if not mandatory_passed:
+    confidence_score = max(min(int(raw_composite), 95), 20)
+
+    # Action Matrix & News Circuit Breaker
+    if news_sentiment_score <= -0.35:
+        # Severe Negative News Override: Protect capital against regulatory probes / fraud / earnings crash
+        action = "AVOID"
+        reason_flag = f"Negative News Alert: Adverse media coverage ({news_label}) overrides technical indicators."
+    elif not mandatory_passed:
         action = "HOLD"
         reason_flag = f"Mandatory Book Rules not fully satisfied ({', '.join(book_eval['failed_mandatory_rules'])})."
-    elif confidence_score >= 78 and technical_score >= 65:
+    elif confidence_score >= 78 and technical_score >= 65 and news_sentiment_score >= -0.10:
         action = "STRONG_BUY"
-        reason_flag = "High institutional consensus with confirmed Stage 2 Minervini trend template alignment."
-    elif confidence_score >= 65:
+        reason_flag = "High institutional consensus, favorable news sentiment, and confirmed Stage 2 trend alignment."
+    elif confidence_score >= 65 and news_sentiment_score >= -0.15:
         action = "ACCUMULATE"
-        reason_flag = "Solid mutual fund backing and healthy fundamentals; accumulate on minor intraday pullbacks."
+        reason_flag = "Solid mutual fund backing, attractive P/E and Book Value, and healthy news backdrop."
     elif confidence_score >= 48:
         action = "HOLD"
         reason_flag = "Consolidating in base range; wait for decisive volume breakout before adding fresh positions."
     else:
         action = "AVOID"
-        reason_flag = "Downtrend structure or lack of institutional support."
+        reason_flag = "Downtrend structure, negative news, or lack of institutional support."
 
-    # 7. Asymmetric Risk Management (ATR-based Stop-Loss and Target)
-    # Stop-Loss = 1.5 * ATR (risk buffer)
-    # Target = 3.2 * ATR (ensuring >= 1:2.13 Risk-to-Reward ratio)
-    stop_buffer = round(atr * 1.5, 2)
-    target_buffer = round(atr * 3.2, 2)
+    # 8. Asymmetric Risk Management (Disciplined 1:3 Risk-to-Reward Ratio)
+    # Stop-Loss buffer based on ATR (minimum 2% buffer for normal volatility)
+    stop_buffer = round(max(atr * 1.5, current_price * 0.02), 2)
+    # 15-Day Swing Target: Strictly 3.0x Risk Buffer (1:3 RR)
+    target_buffer = round(stop_buffer * 3.0, 2)
 
-    stop_loss_price = round(max(current_price - stop_buffer, current_price * 0.94), 2)
+    stop_loss_price = round(current_price - stop_buffer, 2)
     target_price = round(current_price + target_buffer, 2)
 
     expected_return_pct = round(((target_price - current_price) / current_price) * 100, 2)
     max_risk_pct = round(((current_price - stop_loss_price) / current_price) * 100, 2)
-    risk_reward_ratio = round(expected_return_pct / max_risk_pct, 2) if max_risk_pct > 0 else 2.1
+    risk_reward_ratio = 3.0 # Exact 1:3 Risk-Reward Ratio
+
+    # 30-Day Monthly Target Horizons (also maintaining 1:3 RR)
+    monthly_stop_buffer = round(max(stop_buffer * 1.35, current_price - (ema50 * 0.99)), 2)
+    monthly_target_buffer = round(monthly_stop_buffer * 3.0, 2)
+    monthly_target_price = round(current_price + monthly_target_buffer, 2)
+    monthly_stop_loss_price = round(current_price - monthly_stop_buffer, 2)
+    monthly_expected_return_pct = round(((monthly_target_price - current_price) / current_price) * 100, 2)
 
     # Check Upcoming Earnings Catalyst & Event Risk (Minervini & O'Neil Rule)
     earnings_warning = None
@@ -155,21 +206,30 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
             f"Per Minervini SEPA rules, AI tightens stop buffer to mitigate binary earnings gap risk."
         )
         # Moderate confidence to prevent binary roulette trap
-        confidence_score = max(confidence_score - 6, 30)
+        confidence_score = max(confidence_score - 6, 25)
         if action == "STRONG_BUY":
             action = "ACCUMULATE"
 
-    # 8. Detailed AI Thesis Generation
+    # 9. Detailed AI Thesis Generation
+    news_text = f"• **News Sentiment & Catalysts**: {news_label} (Score: {news_score}/100). {stock.news_sentiment_summary or 'No major headwinds.'}\n"
+    if news_headline:
+        news_text += f"   *Latest Headline*: \"{news_headline}\"\n"
+
     ai_thesis = (
         f"**Master Strategy Thesis for {stock.name} ({stock.symbol})**\n\n"
         f"• **Smart Money Signal**: {smart_money['signal']} with ₹{smart_money['total_capital_crores']:,.0f} Cr "
         f"invested across {smart_money['total_funds_holding']} top-tier mutual funds.\n"
         f"• **Trading Books Consensus**: {book_eval['overall_score']}% score across Minervini, O'Neil CAN SLIM, "
         f"and Weinstein Stage 2 frameworks ({book_eval['current_stage']}).\n"
+        f"• **Valuation & Fundamentals**: P/E of {pe:.1f} vs Industry P/E {ind_pe:.1f}. "
+        f"Book Value ₹{book_val:,.1f} (P/B: {pb:.1f}x) with {roe:.1f}% ROE and {stock.piotroski_score}/9 Piotroski score.\n"
+        f"{news_text}"
         f"• **Technical Structure**: Price ₹{current_price:,.2f} relative to 50 EMA (₹{ema50:,.2f}) and 200 EMA (₹{ema200:,.2f}). "
         f"RSI is at {rsi:.1f} with MACD momentum positive.\n"
-        f"• **Risk Management**: Risk ₹{stop_buffer:,.2f} (-{max_risk_pct}%) to make ₹{target_buffer:,.2f} (+{expected_return_pct}%), "
-        f"giving a favorable **{risk_reward_ratio}x Risk-Reward profile**."
+        f"• **Disciplined 1:3 Risk Management**:\n"
+        f"   - 15-Day Swing: Risk ₹{stop_buffer:,.2f} (-{max_risk_pct}%) to make ₹{target_buffer:,.2f} (+{expected_return_pct}%).\n"
+        f"   - 30-Day Monthly: Target 🎯 ₹{monthly_target_price:,.2f} (+{monthly_expected_return_pct}%) | Trailing SL: ₹{monthly_stop_loss_price:,.2f}.\n"
+        f"   - **Strict 1:3 Risk-to-Reward Ratio maintained**."
     )
 
     if earnings_warning:
@@ -178,7 +238,7 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
     if lesson_notes:
         ai_thesis += f"\n\n🛡️ *Self-Learning Safeguard*: {' '.join(lesson_notes)}"
 
-    # 9. Ensure single active prediction per stock (expire older active predictions)
+    # 10. Ensure single active prediction per stock (expire older active predictions)
     AIPrediction.objects.filter(stock=stock, status="ACTIVE").update(status="EXPIRED")
 
     # Create and Save Prediction
@@ -193,8 +253,17 @@ def generate_ai_stock_prediction(stock: Stock, force_new: bool = False) -> AIPre
         max_risk_pct=max_risk_pct,
         risk_reward_ratio=risk_reward_ratio,
         timeframe_days=15,
+        monthly_target_price=monthly_target_price,
+        monthly_expected_return_pct=monthly_expected_return_pct,
+        monthly_stop_loss_price=monthly_stop_loss_price,
+        pe_at_prediction=round(pe, 2),
+        pb_at_prediction=round(pb, 2),
+        book_value_at_prediction=round(book_val, 2),
+        news_score=news_score,
+        news_sentiment=news_label,
+        news_headline=news_headline[:350] if news_headline else "",
         confidence_score=confidence_score,
-        strategy_used="Minervini Trend & Smart Money Consensus Ensemble",
+        strategy_used="Minervini Trend, Smart Money & News Sentiment Ensemble",
         ai_thesis=ai_thesis,
         technical_score=technical_score,
         fundamental_score=fundamental_score,

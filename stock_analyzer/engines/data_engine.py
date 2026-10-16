@@ -6,6 +6,7 @@ import pandas as pd
 import yfinance as yf
 from django.utils import timezone
 from stock_analyzer.models import Stock, DailyPriceData
+from stock_analyzer.engines.news_engine import fetch_and_analyze_stock_news
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +214,21 @@ def fetch_or_update_stock(symbol: str, force_refresh: bool = False) -> Stock:
     ind_name = info.get("industry") or sector
     summary = info.get("longBusinessSummary") or f"{company_name} is one of India's prominent market leaders listed on NSE/BSE."
 
+    # Fetch real-time Indian financial news sentiment
+    try:
+        news_info = fetch_and_analyze_stock_news(symbol, company_name)
+    except Exception as e:
+        logger.warning(f"Failed to fetch news sentiment for {symbol}: {e}")
+        news_info = {
+            "sentiment_score": 0.0,
+            "sentiment_label": "NEUTRAL 🟡",
+            "news_score": 50,
+            "latest_headline": "",
+            "summary": "Neutral news coverage."
+        }
+
+    now_ts = timezone.now()
+
     if not stock:
         stock = Stock.objects.create(
             symbol=symbol,
@@ -244,6 +260,11 @@ def fetch_or_update_stock(symbol: str, force_refresh: bool = False) -> Stock:
             headquarters_city=hq_city,
             industry_name=ind_name,
             business_summary=summary,
+            latest_news_headline=news_info.get("latest_headline", ""),
+            news_sentiment_score=news_info.get("sentiment_score", 0.0),
+            news_sentiment_label=news_info.get("sentiment_label", "NEUTRAL 🟡"),
+            news_sentiment_summary=news_info.get("summary", ""),
+            news_updated_at=now_ts,
             is_nifty50=is_nifty50,
             is_banknifty=is_banknifty
         )
@@ -276,6 +297,11 @@ def fetch_or_update_stock(symbol: str, force_refresh: bool = False) -> Stock:
         stock.headquarters_city = hq_city
         stock.industry_name = ind_name
         stock.business_summary = summary
+        stock.latest_news_headline = news_info.get("latest_headline", "")
+        stock.news_sentiment_score = news_info.get("sentiment_score", 0.0)
+        stock.news_sentiment_label = news_info.get("sentiment_label", "NEUTRAL 🟡")
+        stock.news_sentiment_summary = news_info.get("summary", "")
+        stock.news_updated_at = now_ts
         stock.save()
 
     # Bulk insert/update historical daily price records

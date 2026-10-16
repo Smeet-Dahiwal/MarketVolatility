@@ -8,4 +8,7 @@ __pycache__/
 # Ignore IDE files
 .idea/
 .vscode/
-
+# Scratch databases and temporary results
+patterns.db
+market_predictor.db
+backtest_results.csv

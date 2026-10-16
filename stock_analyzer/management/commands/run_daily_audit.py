@@ -100,6 +100,13 @@ class Command(BaseCommand):
                 "current_price": stock.current_price,
                 "target_price": latest_pred.target_price if latest_pred else None,
                 "stop_loss_price": latest_pred.stop_loss_price if latest_pred else None,
+                "monthly_target_price": latest_pred.monthly_target_price if latest_pred else None,
+                "monthly_expected_return_pct": latest_pred.monthly_expected_return_pct if latest_pred else None,
+                "risk_reward_ratio": latest_pred.risk_reward_ratio if latest_pred else 3.0,
+                "pe_ratio": stock.pe_ratio,
+                "pb_ratio": stock.pb_ratio,
+                "book_value": stock.book_value,
+                "news_sentiment": stock.news_sentiment_label,
                 "confidence_score": latest_pred.confidence_score if latest_pred else 75,
                 "win_rate": s_win_rate,
                 "trades_count": s_total

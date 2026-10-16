@@ -36,6 +36,13 @@ class Stock(models.Model):
     industry_name = models.CharField(max_length=120, default="Major Banks")
     business_summary = models.TextField(blank=True, default="")
 
+    # Real-Time News Trading & Sentiment Factors
+    latest_news_headline = models.CharField(max_length=350, blank=True, default="")
+    news_sentiment_score = models.FloatField(default=0.0) # -1.0 (Bearish) to +1.0 (Bullish)
+    news_sentiment_label = models.CharField(max_length=40, default="NEUTRAL 🟡")
+    news_sentiment_summary = models.TextField(blank=True, default="")
+    news_updated_at = models.DateTimeField(null=True, blank=True)
+
     is_nifty50 = models.BooleanField(default=False)
     is_banknifty = models.BooleanField(default=False)
     last_updated = models.DateTimeField(auto_now=True)
@@ -158,8 +165,24 @@ class AIPrediction(models.Model):
     stop_loss_price = models.FloatField()
     expected_return_pct = models.FloatField()
     max_risk_pct = models.FloatField()
-    risk_reward_ratio = models.FloatField(default=2.0)
+    risk_reward_ratio = models.FloatField(default=3.0) # Disciplined 1:3 Risk-to-Reward Ratio
     timeframe_days = models.IntegerField(default=15)
+    
+    # 30-Day Monthly Target Horizons
+    monthly_target_price = models.FloatField(null=True, blank=True)
+    monthly_expected_return_pct = models.FloatField(null=True, blank=True)
+    monthly_stop_loss_price = models.FloatField(null=True, blank=True)
+
+    # Fundamental & Valuation Snapshot at Prediction
+    pe_at_prediction = models.FloatField(null=True, blank=True)
+    pb_at_prediction = models.FloatField(null=True, blank=True)
+    book_value_at_prediction = models.FloatField(null=True, blank=True)
+
+    # News Trading & Sentiment Impact
+    news_score = models.IntegerField(default=50) # 0 to 100
+    news_sentiment = models.CharField(max_length=40, default="NEUTRAL 🟡")
+    news_headline = models.CharField(max_length=350, blank=True, default="")
+
     confidence_score = models.IntegerField(default=80)
     strategy_used = models.CharField(max_length=200, default="Minervini Trend & Smart Money Consensus")
     ai_thesis = models.TextField()

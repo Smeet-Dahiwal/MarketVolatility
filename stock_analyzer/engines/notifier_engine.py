@@ -85,17 +85,22 @@ def send_telegram_alert(
             icon = "🟢" if "BUY" in action else ("📈" if action == "ACCUMULATE" else "🔴")
             label = "STRONG BUY" if action == "STRONG_BUY" else ("ACCUMULATE" if action == "ACCUMULATE" else "AVOID")
             curr = f"₹{item.get('current_price', 0):,.0f}"
-            tgt = f"₹{item.get('target_price', 0):,.0f}"
-            sl = f"₹{item.get('stop_loss_price', 0):,.0f}"
+            tgt_15d = f"₹{item.get('target_price', 0):,.0f}" if item.get('target_price') else "—"
+            tgt_30d = f"₹{item.get('monthly_target_price', 0):,.0f}" if item.get('monthly_target_price') else "—"
+            sl = f"₹{item.get('stop_loss_price', 0):,.0f}" if item.get('stop_loss_price') else "—"
             win_rate = item.get("win_rate", 70.0)
             conf = item.get("confidence_score", 75)
             cnt = item.get("trades_count", 0)
             tag = f"({cnt} trades)" if cnt > 0 else ""
+            pe_val = f"{item.get('pe_ratio', 22.0):.1f}" if item.get('pe_ratio') else "—"
+            pb_val = f"{item.get('pb_ratio', 2.8):.1f}" if item.get('pb_ratio') else "—"
+            news_lbl = item.get("news_sentiment", "NEUTRAL 🟡")
 
             lines.append(
                 f"{idx}. {icon} <b>{sym}</b> · <b>{label}</b>\n"
-                f"   {curr} ➔ 🎯 <b>{tgt}</b> | SL: {sl}\n"
-                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · Conf: <b>{conf}%</b>"
+                f"   CMP: {curr} ➔ 🎯 <b>15D: {tgt_15d}</b> | 🗓️ <b>30D: {tgt_30d}</b>\n"
+                f"   🛡️ SL: {sl} (<b>RR: 1:3</b>) · News: {news_lbl}\n"
+                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · P/E: {pe_val} (P/B: {pb_val}x)"
             )
     else:
         lines.append("")
@@ -110,7 +115,8 @@ def send_telegram_alert(
             curr = f"₹{item.get('current_price', 0):,.0f}"
             tgt = f"₹{item.get('target_price', 0):,.0f}"
             win_rate = item.get("win_rate", 60.0)
-            lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} (Win: {win_rate:.0f}%)")
+            pe_str = f"P/E {item.get('pe_ratio', 22):.0f}" if item.get('pe_ratio') else ""
+            lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} ({pe_str} | Win: {win_rate:.0f}%)")
 
     # 3. Resolved Audits Today (Deduplicated per stock symbol)
     if newly_resolved_audits:
