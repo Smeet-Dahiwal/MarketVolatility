@@ -205,51 +205,66 @@
         </div>
       </div>
 
-      <!-- Column 2: Profitability, Growth & Solvency -->
+      <!-- Column 2: Quarterly P&L & Profitability (CAN SLIM 'C') -->
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
         <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-green); letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
-          <span>📈 Profitability & Solvency</span>
-          <span style="font-size: 0.72rem; color: var(--text-dim);">Quality Screen</span>
+          <span>💰 Quarterly P&L & Earnings</span>
+          <span class="badge {% if stock.is_quarterly_profitable %}badge-strong-buy{% else %}badge-avoid{% endif %}" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">
+            {% if stock.is_quarterly_profitable %}Profitable ✅{% else %}Net Loss ❌{% endif %}
+          </span>
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <!-- Return on Equity (ROE) -->
+          <!-- Quarterly Net Profit -->
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
             <div>
-              <div style="font-size: 0.85rem; color: var(--text-muted);">Return on Equity (ROE)</div>
-              <div style="font-size: 0.72rem; color: var(--text-dim);">Minervini Benchmark &gt; 15%</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Quarterly Net Profit</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Latest Reported Quarter</div>
             </div>
             <div style="text-align: right;">
-              <span style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; {% if stock.roe_pct >= 15 %}color: var(--accent-green);{% else %}color: #fff;{% endif %}">
-                {{ stock.roe_pct|floatformat:1|default:"N/A" }}%
+              <span style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; {% if stock.is_quarterly_profitable %}color: var(--accent-green);{% else %}color: var(--accent-rose);{% endif %}">
+                {% if stock.quarterly_net_profit_crores %}₹{{ stock.quarterly_net_profit_crores|floatformat:1 }} Cr{% else %}N/A{% endif %}
               </span>
             </div>
           </div>
 
-          <!-- Operating Margin -->
+          <!-- YoY Quarterly Profit Growth -->
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <div style="font-size: 0.85rem; color: var(--text-muted);">Operating Margin (OPM)</div>
-            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
-              {{ stock.operating_margin_pct|floatformat:1|default:"N/A" }}%
-            </span>
+            <div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">YoY Profit Growth</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">O'Neil CAN SLIM Target &gt; 15%</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; {% if stock.quarterly_profit_growth_yoy and stock.quarterly_profit_growth_yoy >= 15 %}color: var(--accent-green);{% elif stock.quarterly_profit_growth_yoy and stock.quarterly_profit_growth_yoy > 0 %}color: #f59e0b;{% else %}color: var(--accent-rose);{% endif %}">
+                {% if stock.quarterly_profit_growth_yoy %}{{ stock.quarterly_profit_growth_yoy|floatformat:1 }}%{% else %}{{ stock.eps_growth_yoy|floatformat:1|default:"0.0" }}%{% endif %}
+              </span>
+            </div>
           </div>
 
-          <!-- Net Profit Margin -->
+          <!-- Quarterly Revenue & Growth -->
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <div style="font-size: 0.85rem; color: var(--text-muted);">Net Profit Margin (NPM)</div>
-            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
-              {{ stock.profit_margin_pct|floatformat:1|default:"N/A" }}%
-            </span>
+            <div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">Quarterly Revenue</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Top-Line Sales</div>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; color: #fff;">
+                {% if stock.quarterly_revenue_crores %}₹{{ stock.quarterly_revenue_crores|floatformat:1 }} Cr{% else %}N/A{% endif %}
+              </span>
+              {% if stock.quarterly_revenue_growth_yoy %}
+              <div style="font-size: 0.7rem; color: var(--accent-cyan);">+{{ stock.quarterly_revenue_growth_yoy|floatformat:1 }}% YoY</div>
+              {% endif %}
+            </div>
           </div>
 
-          <!-- Debt to Equity & EPS Growth -->
+          <!-- Return on Equity (ROE) & Debt -->
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div style="font-size: 0.85rem; color: var(--text-muted);">Debt to Equity</div>
-              <div style="font-size: 0.72rem; color: var(--text-dim);">Safe &lt; 1.5x</div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">ROE / Debt-to-Equity</div>
+              <div style="font-size: 0.72rem; color: var(--text-dim);">Solvency & Capital Efficiency</div>
             </div>
-            <span style="font-family: var(--font-mono); font-size: 1.05rem; font-weight: 700; {% if stock.debt_to_equity < 1.0 %}color: var(--accent-green);{% elif stock.debt_to_equity < 2.0 %}color: #f59e0b;{% else %}color: var(--accent-rose);{% endif %}">
-              {{ stock.debt_to_equity|floatformat:2|default:"0.00" }}x
+            <span style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: #fff;">
+              {{ stock.roe_pct|floatformat:1|default:"0" }}% / {{ stock.debt_to_equity|floatformat:2|default:"0" }}x
             </span>
           </div>
         </div>

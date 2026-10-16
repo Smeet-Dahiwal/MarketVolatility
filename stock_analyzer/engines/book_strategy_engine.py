@@ -36,21 +36,21 @@ BOOK_RULES_CATALOG = [
         "master_name": "William O'Neil",
         "book_title": "How to Make Money in Stocks",
         "rule_code": "ONEIL_INSTITUTIONAL_SPONSOR",
-        "rule_name": "CAN SLIM 'I' - Institutional Mutual Fund Sponsorship",
-        "description": "The stock must have ownership and accumulating interest from top mutual funds and institutional investors.",
+        "rule_name": "CAN SLIM 'I' - Institutional Sponsorship & Float Structure",
+        "description": "Stock must have institutional backing (FII + DII >= 20%) and controlled retail holding (< 55%) to avoid weak-hand selloffs.",
         "category": "INSTITUTIONAL",
-        "importance_weight": 1.2,
+        "importance_weight": 1.25,
         "is_mandatory_filter": True
     },
     {
         "master_name": "William O'Neil",
         "book_title": "How to Make Money in Stocks",
         "rule_code": "ONEIL_EARNINGS_GROWTH",
-        "rule_name": "CAN SLIM 'C & A' - Consistent EPS / Profit Growth",
-        "description": "Company must show positive quarterly and annual earnings growth (minimum 10-15% YoY).",
+        "rule_name": "CAN SLIM 'C & A' - Quarterly Profitability & Growth",
+        "description": "Company must be quarterly profitable with positive net income and quarterly profit growth >= 10% YoY.",
         "category": "VALUATION",
-        "importance_weight": 1.1,
-        "is_mandatory_filter": False
+        "importance_weight": 1.25,
+        "is_mandatory_filter": True
     },
     {
         "master_name": "Stan Weinstein",
@@ -104,7 +104,7 @@ def seed_trading_book_rules():
         )
 
 
-def evaluate_all_book_strategies(stock: Stock):
+def evaluate_all_book_strategies(stock: Stock, as_of_date=None):
     """
     Evaluates a stock across all Master Trader books & rules.
     Returns:
@@ -112,7 +112,10 @@ def evaluate_all_book_strategies(stock: Stock):
       - checklist: list of individual rule evaluations (pass/fail, explanation)
       - books_summary: dictionary grouped by master/book
     """
-    prices = DailyPriceData.objects.filter(stock=stock).order_by("-date")[:60]
+    query = DailyPriceData.objects.filter(stock=stock)
+    if as_of_date:
+        query = query.filter(date__lte=as_of_date)
+    prices = query.order_by("-date")[:60]
     if not prices.exists():
         return {
             "overall_score": 50,
@@ -166,21 +169,43 @@ def evaluate_all_book_strategies(stock: Stock):
         f"High daily price swings ({vcp_ratio:.2f}% ATR volatility)."
     )
 
-    # 4. William O'Neil Institutional Sponsorship
+    # 4. William O'Neil Institutional Sponsorship & Float Structure
+    fii = stock.fii_holding_pct or 0.0
+    dii = stock.dii_holding_pct or 0.0
+    inst_holding = fii + dii
+    retail = stock.retail_holding_pct if stock.retail_holding_pct is not None else round(max(100.0 - (stock.promoter_holding_pct or 0.0) - inst_holding, 0.0), 2)
     mf_holdings = stock.fund_holdings.all()
     mf_count = mf_holdings.count()
     mf_capital = sum(h.holding_value_crores for h in mf_holdings)
-    oneil_sponsor_passed = mf_count >= 2 or mf_capital > 2000.0
-    oneil_sponsor_note = (
-        f"Backed by {mf_count} top Indian Mutual Funds with ₹{mf_capital:,.0f} Cr capital deployed."
-        if oneil_sponsor_passed else
-        "Low or unconfirmed institutional mutual fund backing."
-    )
 
-    # 5. O'Neil Earnings Growth
+    inst_passed = (inst_holding >= 20.0 or mf_count >= 2 or mf_capital > 2000.0)
+    retail_passed = (retail <= 55.0)
+    oneil_sponsor_passed = inst_passed and retail_passed
+
+    if not retail_passed:
+        oneil_sponsor_note = f"High Retail Float ({retail:.1f}% > 55%). Weak-hand crowd poses sharp panic selloff risk."
+    elif inst_passed:
+        oneil_sponsor_note = f"Strong Institutional Backing: FII {fii:.1f}% + DII {dii:.1f}% ({inst_holding:.1f}% total) across {mf_count} Mutual Funds (₹{mf_capital:,.0f} Cr)."
+    else:
+        oneil_sponsor_note = f"Low Institutional Ownership (FII+DII {inst_holding:.1f}% < 20%). Lacks required mutual fund accumulation."
+
+    # 5. O'Neil Quarterly Profitability & Earnings Growth (CAN SLIM 'C')
+    is_profitable = stock.is_quarterly_profitable
+    q_profit = stock.quarterly_net_profit_crores
+    q_growth = stock.quarterly_profit_growth_yoy
     eps_growth = stock.eps_growth_yoy or 12.0
-    earnings_passed = eps_growth >= 10.0
-    earnings_note = f"EPS YoY Growth at {eps_growth:.1f}% (O'Neil benchmark: >10%)."
+
+    if is_profitable is False and q_profit is not None and q_profit < 0:
+        earnings_passed = False
+        earnings_note = f"FAILED: Company reported quarterly net loss of -₹{abs(q_profit):,.1f} Cr. CAN SLIM 'C' strictly prohibits buying unprofitable companies."
+    elif q_growth is not None and q_growth < 0:
+        earnings_passed = False
+        earnings_note = f"FAILED: Quarterly profit declined {q_growth:+.1f}% YoY (CAN SLIM requires accelerating earnings >10%)."
+    else:
+        growth_val = q_growth if q_growth is not None else eps_growth
+        earnings_passed = growth_val >= 10.0
+        profit_str = f"Net Profit: ₹{q_profit:,.1f} Cr | " if q_profit is not None else ""
+        earnings_note = f"{profit_str}YoY Growth: {growth_val:+.1f}% (Meets CAN SLIM earnings criteria)."
 
     # 6. Stan Weinstein Stage 2
     stage_2_passed = current_price > ema200 and ema50 > ema200
@@ -228,10 +253,10 @@ def evaluate_all_book_strategies(stock: Stock):
             "code": "ONEIL_INSTITUTIONAL_SPONSOR",
             "master": "William O'Neil",
             "book": "How to Make Money in Stocks",
-            "name": "CAN SLIM 'I' - Mutual Fund Sponsorship",
+            "name": "CAN SLIM 'I' - Institutional Sponsorship & Float Structure",
             "passed": oneil_sponsor_passed,
             "note": oneil_sponsor_note,
-            "weight": 1.2,
+            "weight": 1.25,
             "is_mandatory": True
         },
         {
@@ -258,11 +283,11 @@ def evaluate_all_book_strategies(stock: Stock):
             "code": "ONEIL_EARNINGS_GROWTH",
             "master": "William O'Neil",
             "book": "How to Make Money in Stocks",
-            "name": "CAN SLIM 'C & A' - Earnings Growth",
+            "name": "CAN SLIM 'C & A' - Quarterly Profitability & Growth",
             "passed": earnings_passed,
             "note": earnings_note,
-            "weight": 1.1,
-            "is_mandatory": False
+            "weight": 1.25,
+            "is_mandatory": True
         },
         {
             "code": "GRAHAM_MARGIN_OF_SAFETY",

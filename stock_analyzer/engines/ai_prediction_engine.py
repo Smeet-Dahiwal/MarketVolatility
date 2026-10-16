@@ -9,7 +9,8 @@ from stock_analyzer.engines.data_engine import get_market_benchmarks
 def generate_ai_stock_prediction(
     stock: Stock,
     timeframe_type: str = "DAILY",
-    force_new: bool = False
+    force_new: bool = False,
+    as_of_date=None
 ) -> AIPrediction:
     """
     Generates multi-factor AI trade forecast for a specific horizon:
@@ -18,7 +19,7 @@ def generate_ai_stock_prediction(
     - MONTHLY: 1-month position trend (verified monthly / 20 days).
     All horizons enforce a strict 1:3 Risk-to-Reward ratio.
     """
-    today = timezone.now().date()
+    today = as_of_date if as_of_date else timezone.now().date()
     timeframe_type = timeframe_type.upper()
     if timeframe_type not in ["DAILY", "WEEKLY", "MONTHLY"]:
         timeframe_type = "DAILY"
@@ -39,8 +40,12 @@ def generate_ai_stock_prediction(
             elif timeframe_type == "MONTHLY" and days_elapsed < 20:
                 return existing
 
-    # 1. Fetch latest prices & technicals
-    prices = DailyPriceData.objects.filter(stock=stock).order_by("-date")[:30]
+    # 1. Fetch latest prices & technicals (as of as_of_date)
+    price_query = DailyPriceData.objects.filter(stock=stock)
+    if as_of_date:
+        price_query = price_query.filter(date__lte=as_of_date)
+    prices = price_query.order_by("-date")[:30]
+
     if not prices.exists():
         current_price = stock.current_price or 1600.0
         atr = current_price * 0.018
@@ -57,11 +62,11 @@ def generate_ai_stock_prediction(
         ema50 = latest.ema_50 or current_price
         ema200 = latest.ema_200 or current_price
 
-    # 2. Evaluate Smart Money & Book Strategies
+    # 2. Evaluate Smart Money & Book Strategies (with as_of_date)
     smart_money = get_stock_smart_money_analysis(stock)
     smart_money_score = smart_money["consensus_score"]
 
-    book_eval = evaluate_all_book_strategies(stock)
+    book_eval = evaluate_all_book_strategies(stock, as_of_date=as_of_date)
     book_rules_score = book_eval["overall_score"]
     mandatory_passed = book_eval["mandatory_filters_passed"]
 
@@ -88,7 +93,7 @@ def generate_ai_stock_prediction(
 
     technical_score = max(min(int(tech_score), 98), 15)
 
-    # 4. Calculate Fundamental Score with Book Value & P/E Ratio (0 - 100)
+    # 4. Calculate Fundamental Score with Book Value, P/E Ratio, Shareholding & Quarterly P&L (0 - 100)
     fund_score = 50
     if stock.market_cap_crores > 50000:
         fund_score += 10  # High liquidity large cap stability
@@ -130,6 +135,51 @@ def generate_ai_stock_prediction(
         fund_score += 8  # Pristine balance sheet / low leverage
     elif debt_eq > 1.8:
         fund_score -= 12  # Overleveraged debt risk
+
+    # Shareholding Distribution Evaluation (FII, DII, Promoters, Retailers)
+    fii = stock.fii_holding_pct or 0.0
+    dii = stock.dii_holding_pct or 0.0
+    promoter = stock.promoter_holding_pct or 0.0
+    inst_holding = fii + dii
+    retail = stock.retail_holding_pct if stock.retail_holding_pct is not None else round(max(100.0 - promoter - inst_holding, 0.0), 2)
+
+    if inst_holding >= 35.0:
+        fund_score += 10  # Strong Institutional Sponsorship (CAN SLIM 'I')
+    elif inst_holding >= 20.0:
+        fund_score += 5
+    elif inst_holding < 15.0:
+        fund_score -= 8   # Under-owned by institutions
+
+    if promoter >= 50.0:
+        fund_score += 6   # Strong founder skin-in-the-game
+    elif promoter < 25.0 and stock.sector != "Financial Services":
+        fund_score -= 5
+
+    if retail > 50.0:
+        fund_score -= 12  # Heavy retail crowd / panic vulnerability
+    elif retail < 25.0:
+        fund_score += 6   # Tightly controlled float
+
+    # Quarterly Profit/Loss & Growth Evaluation (CAN SLIM 'C')
+    is_profitable = stock.is_quarterly_profitable
+    q_profit = stock.quarterly_net_profit_crores
+    q_growth = stock.quarterly_profit_growth_yoy
+    q_rev = stock.quarterly_revenue_crores
+    q_rev_growth = stock.quarterly_revenue_growth_yoy
+
+    if is_profitable is False and q_profit is not None and q_profit < 0:
+        fund_score -= 25  # Quarterly loss penalty
+    else:
+        fund_score += 8
+        if q_growth is not None:
+            if q_growth >= 20.0:
+                fund_score += 15  # O'Neil CAN SLIM target (>20% YoY earnings acceleration)
+            elif q_growth >= 10.0:
+                fund_score += 8
+            elif q_growth < 0:
+                fund_score -= 10  # Quarterly earnings contraction
+        if q_rev_growth is not None and q_rev_growth >= 15.0:
+            fund_score += 5   # Top-line revenue expansion
 
     fundamental_score = max(min(int(fund_score), 98), 15)
 
@@ -173,8 +223,17 @@ def generate_ai_stock_prediction(
 
     confidence_score = max(min(int(raw_composite), 95), 20)
 
-    # Action Matrix & News Circuit Breaker
-    if news_sentiment_score <= -0.35:
+    # Action Matrix, Fundamental Pre-Prediction Circuit Breakers & News Filter
+    if is_profitable is False and q_profit is not None and q_profit < 0:
+        # Strict William O'Neil CAN SLIM 'C' Rule: NEVER buy unprofitable companies
+        action = "AVOID"
+        reason_flag = f"Quarterly Net Loss Warning: Operating at net loss of -₹{abs(q_profit):,.1f} Cr. William O'Neil CAN SLIM 'C' rule strictly blocks fresh buy calls on loss-making quarters."
+        confidence_score = min(confidence_score, 38)
+    elif retail > 55.0 and inst_holding < 20.0:
+        action = "AVOID"
+        reason_flag = f"Retail Distribution Risk: Retailers own {retail:.1f}% vs institutions {inst_holding:.1f}%. High panic dump risk."
+        confidence_score = min(confidence_score, 42)
+    elif news_sentiment_score <= -0.35:
         # Severe Negative News Override: Protect capital against regulatory probes / fraud / earnings crash
         action = "AVOID"
         reason_flag = f"Negative News Alert: Adverse media coverage ({news_label}) overrides technical indicators."
@@ -248,10 +307,18 @@ def generate_ai_stock_prediction(
     if news_headline:
         news_text += f"   *Latest Headline*: \"{news_headline}\"\n"
 
+    # Format Quarterly Profit & Shareholding summary for Thesis
+    profit_desc = f"Net Profit: ₹{q_profit:,.1f} Cr ({'Profitable ✅' if is_profitable else 'Loss-Making ❌'})" if q_profit is not None else "Profitable Base"
+    growth_desc = f" | YoY Profit Growth: {q_growth:+.1f}%" if q_growth is not None else ""
+    rev_desc = f" | Revenue: ₹{q_rev:,.1f} Cr" if q_rev is not None else ""
+
     ai_thesis = (
         f"**Master Strategy Thesis for {stock.name} ({stock.symbol}) — [{horizon_title}]**\n\n"
         f"• **Smart Money Signal**: {smart_money['signal']} with ₹{smart_money['total_capital_crores']:,.0f} Cr "
         f"invested across {smart_money['total_funds_holding']} top-tier mutual funds.\n"
+        f"• **Shareholding Structure**: Promoters: {promoter:.1f}% | Foreign Investors (FII): {fii:.1f}% | "
+        f"Mutual Funds / DII: {dii:.1f}% | Retailers: {retail:.1f}%.\n"
+        f"• **Quarterly P&L Performance**: {profit_desc}{growth_desc}{rev_desc} (O'Neil CAN SLIM 'C' Verified).\n"
         f"• **Trading Books Consensus**: {book_eval['overall_score']}% score across Minervini, O'Neil CAN SLIM, "
         f"and Weinstein Stage 2 frameworks ({book_eval['current_stage']}).\n"
         f"• **Valuation & Fundamentals**: P/E of {pe:.1f} vs Industry P/E {ind_pe:.1f}. "
@@ -292,6 +359,13 @@ def generate_ai_stock_prediction(
         pe_at_prediction=round(pe, 2),
         pb_at_prediction=round(pb, 2),
         book_value_at_prediction=round(book_val, 2),
+        promoter_holding_at_prediction=round(promoter, 2),
+        fii_holding_at_prediction=round(fii, 2),
+        dii_holding_at_prediction=round(dii, 2),
+        retail_holding_at_prediction=round(retail, 2),
+        quarterly_profit_crores_at_prediction=round(q_profit, 2) if q_profit is not None else None,
+        quarterly_growth_at_prediction=round(q_growth, 2) if q_growth is not None else None,
+        is_quarterly_profitable_at_prediction=bool(is_profitable),
         news_score=news_score,
         news_sentiment=news_label,
         news_headline=news_headline[:350] if news_headline else "",
@@ -308,7 +382,7 @@ def generate_ai_stock_prediction(
     return prediction
 
 
-def generate_all_timeframe_predictions(stock: Stock, force_new: bool = False) -> dict:
+def generate_all_timeframe_predictions(stock: Stock, force_new: bool = False, as_of_date=None) -> dict:
     """
     Generates / Refreshes all 3 horizons (Daily, Weekly, Monthly) for a stock.
     - Daily: verified next day (after 1 day).
@@ -316,7 +390,7 @@ def generate_all_timeframe_predictions(stock: Stock, force_new: bool = False) ->
     - Monthly: verified monthly (20-day cycle).
     """
     return {
-        "DAILY": generate_ai_stock_prediction(stock, timeframe_type="DAILY", force_new=force_new),
-        "WEEKLY": generate_ai_stock_prediction(stock, timeframe_type="WEEKLY", force_new=force_new),
-        "MONTHLY": generate_ai_stock_prediction(stock, timeframe_type="MONTHLY", force_new=force_new),
+        "DAILY": generate_ai_stock_prediction(stock, timeframe_type="DAILY", force_new=force_new, as_of_date=as_of_date),
+        "WEEKLY": generate_ai_stock_prediction(stock, timeframe_type="WEEKLY", force_new=force_new, as_of_date=as_of_date),
+        "MONTHLY": generate_ai_stock_prediction(stock, timeframe_type="MONTHLY", force_new=force_new, as_of_date=as_of_date),
     }

@@ -95,16 +95,27 @@ Retail investors react to news; institutions drive price trends. We track instit
   * 📈 **Accumulating**: Consistent net positive inflows.
   * ⚖️ **Stable Hold**: Institutional lock-in.
   * 📉 **Trimming**: Distribution warning signal.
-* **Institutional Consensus Score ($0 - 100$)**: Measures collec### D. Fundamental Health, Book Value & P/E Valuation
-Technical patterns fail when company balance sheets deteriorate or valuations become detached from reality. We evaluate:
-* **Book Value per Share & Price-to-Book (P/B)**: Calculated and saved daily. Assesses the asset-backed safety floor of the company. Stocks trading near reasonable book multiples receive positive valuation scoring.
-* **Price-to-Earnings (P/E) Ratio vs. Sector Benchmarks**:
-  * P/E $< 30$ or below sectoral median indicates value cushion (higher fundamental score).
-  * High P/E bubble traps ($> 85$) or negative P/E (loss-making operations) incur valuation penalties.
-* **Piotroski F-Score (1 to 9)**: Evaluates profitability, leverage, liquidity, and operational efficiency. Scores $\ge 7$ represent high quality.
-* **Return on Equity (ROE)** & **Operating Margins**: Confirms capital efficiency and moat.
-* **Debt-to-Equity Ratio**: Penalizes overleveraged balance sheets ($D/E > 1.5$).
-* **Shareholding Structure**: Promoter, FII, and DII holding percentages.
+### D. Fundamental Health, Shareholding Distribution & Quarterly P&L (CAN SLIM 'C & I')
+Technical patterns fail when company balance sheets deteriorate or earnings turn negative. We perform a strict fundamental audit before any prediction:
+
+1. **Quarterly Profit & Loss Pre-Prediction Checks (William O'Neil CAN SLIM 'C')**:
+   * **Quarterly Net Profit (₹ Crores)**: Extracted directly from official quarterly income statements.
+   * **Unprofitable Quarter Safety Block**: If a company reports a quarterly net loss (`is_quarterly_profitable == False`), the engine **blocks all fresh buy calls and overrides the action to `AVOID 🔴` / `HOLD 🟡`** with an automatic $-25$ fundamental penalty.
+   * **YoY Quarterly Profit Growth**: William O'Neil's canonical benchmark requires at least **$15\% - 25\%$ YoY profit acceleration**. Stocks exceeding this threshold receive a $+15$ fundamental bonus.
+   * **Top-Line Revenue Expansion**: Verified via quarterly revenue growth ($\ge 15\%$ YoY) to confirm organic business expansion.
+
+2. **Shareholding Distribution Breakdown (CAN SLIM 'I')**:
+   * **Foreign Institutional Investors (FII)**: Tracks foreign institutional sponsorship percentage.
+   * **Domestic Institutional Investors (DII / Mutual Funds)**: Measures domestic asset manager backing.
+   * **Promoter Holding**: Evaluates founder skin-in-the-game ($\ge 50\%$ preferred, $< 25\%$ flagged).
+   * **Public / Retail Float ("Weak Hands")**: Retail ownership $> 50\%$ signals high panic-selling vulnerability during corrections and incurs a $-12$ fundamental penalty. Conversely, tight institutional float ($\text{FII} + \text{DII} \ge 35\%$) receives a stability bonus.
+   * **Snapshot at Prediction**: Every generated forecast locks in the exact shareholding distribution and quarterly profit numbers at that exact moment for audit transparency.
+
+3. **Valuation Multiples & Solvency**:
+   * **Book Value per Share & Price-to-Book (P/B)**: Calculated daily to assess asset-backed margin of safety.
+   * **Price-to-Earnings (P/E) vs. Sector**: Evaluated against industry median P/E and growth rate.
+   * **Piotroski F-Score ($1 - 9$)**: Solvency score evaluating profitability, leverage, and liquidity.
+   * **Debt-to-Equity ($D/E < 1.0$)** & **Return on Equity ($\text{ROE} \ge 15\%$)**: Ensures conservative leverage and high capital efficiency.
 
 ---
 
@@ -294,7 +305,17 @@ Visit `http://127.0.0.1:8000/` to explore the interactive terminal.
 python manage.py run_daily_audit
 ```
 
-### 4. Inspect Database Tables & Fields
+### 4. Run 1-Year Historical Backfill Simulation (365 Days / 261 Trading Sessions)
+To simulate the past 1 full year of AI predictions, 1:3 risk-to-reward verifications, and post-mortem diagnostics across all 261 trading sessions:
+```bash
+# Clean reset and populate 1 full year of verified trades into the local database
+python manage.py run_yearly_backfill --reset
+
+# Run a quick simulation of the last 30 trading days
+python manage.py run_yearly_backfill --days 30
+```
+
+### 5. Inspect Database Tables & Fields
 ```bash
 python inspect_db.py
 ```

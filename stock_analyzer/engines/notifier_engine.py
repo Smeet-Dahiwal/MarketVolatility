@@ -101,10 +101,24 @@ def send_telegram_alert(
             weekly_tgt = f"₹{item.get('weekly_target_price', 0):,.0f}" if item.get('weekly_target_price') else tgt_15d
             monthly_tgt = f"₹{item.get('monthly_target_price', 0):,.0f}" if item.get('monthly_target_price') else tgt_30d
 
+            fii = item.get("fii_holding")
+            dii = item.get("dii_holding")
+            retail = item.get("retail_holding")
+            q_prof = item.get("quarterly_profit")
+            q_gr = item.get("quarterly_growth")
+            fund_parts = []
+            if fii is not None and dii is not None:
+                fund_parts.append(f"FII: {fii:.0f}% · DII: {dii:.0f}% · Retail: {retail or 0:.0f}%")
+            if q_prof is not None:
+                gr_sign = "+" if q_gr and q_gr > 0 else ""
+                fund_parts.append(f"Qtr Profit: ₹{q_prof:,.0f} Cr ({gr_sign}{q_gr or 0:.0f}% YoY)")
+            fund_str = f"   📊 {' | '.join(fund_parts)}\n" if fund_parts else ""
+
             lines.append(
                 f"{idx}. {icon} <b>{sym}</b> · <b>{label}</b>\n"
                 f"   CMP: {curr} ➔ ⚡ <b>Next-Day: {daily_tgt}</b> (SL: {daily_sl})\n"
                 f"   📅 <b>Weekly: {weekly_tgt}</b> | 🗓️ <b>Monthly: {monthly_tgt}</b> [<b>RR: 1:3</b>]\n"
+                f"{fund_str}"
                 f"   📰 News: {news_lbl} · P/E: {pe_val} (P/B: {pb_val}x)\n"
                 f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · Conf: {conf}%"
             )

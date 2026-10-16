@@ -12,26 +12,30 @@ from stock_analyzer.models import (
 from stock_analyzer.engines.data_engine import get_market_benchmarks
 
 
-def run_daily_verification_audit():
+def run_daily_verification_audit(as_of_date=None):
     """
     Simulates / Executes the End-of-Day (4:00 PM IST) automated verification:
-    1. Checks all ACTIVE predictions against price High/Low.
+    1. Checks all ACTIVE predictions against price High/Low up to as_of_date.
     2. Resolves outcomes (Target Hit vs Stop-Loss Hit vs Expired).
     3. Triggers automated Post-Mortem and Book Re-Audit on failed predictions.
     4. Updates cumulative track record & DailyVerificationLog.
     """
-    today = timezone.now().date()
-    active_predictions = AIPrediction.objects.filter(status="ACTIVE").select_related("stock")
+    today = as_of_date if as_of_date else timezone.now().date()
+    active_predictions = AIPrediction.objects.filter(
+        status="ACTIVE",
+        prediction_date__lte=today
+    ).select_related("stock")
     
     targets_hit_today = 0
     stop_losses_hit_today = 0
     resolved_today_audits = []
 
     for pred in active_predictions:
-        # Get price bars after or on prediction date, ordered chronologically
+        # Get price bars between prediction date and today, ordered chronologically
         price_bars = DailyPriceData.objects.filter(
             stock=pred.stock,
-            date__gte=pred.prediction_date
+            date__gte=pred.prediction_date,
+            date__lte=today
         ).order_by("date")
 
         if not price_bars.exists():
@@ -143,16 +147,20 @@ def run_daily_verification_audit():
                 resolved = True
                 break
 
-    # Compute overall ledger stats
-    total_completed = AIPrediction.objects.exclude(status="ACTIVE").count()
-    total_wins = AIPrediction.objects.filter(status="TARGET_HIT").count()
+    # Compute overall ledger stats (as of today)
+    completed_query = AIPrediction.objects.exclude(status="ACTIVE")
+    if as_of_date:
+        completed_query = completed_query.filter(resolved_date__lte=today)
+    total_completed = completed_query.count()
+    total_wins = completed_query.filter(status="TARGET_HIT").count()
     win_rate = round((total_wins / total_completed * 100), 1) if total_completed > 0 else 0.0
+    active_count = AIPrediction.objects.filter(status="ACTIVE", prediction_date__lte=today).count()
 
     # Save daily log
     DailyVerificationLog.objects.update_or_create(
         audit_date=today,
         defaults={
-            "active_predictions_count": AIPrediction.objects.filter(status="ACTIVE").count(),
+            "active_predictions_count": active_count,
             "targets_hit_today": targets_hit_today,
             "stop_losses_hit_today": stop_losses_hit_today,
             "cumulative_win_rate_pct": win_rate,

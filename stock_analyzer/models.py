@@ -21,6 +21,15 @@ class Stock(models.Model):
     promoter_holding_pct = models.FloatField(null=True, blank=True)
     fii_holding_pct = models.FloatField(null=True, blank=True)
     dii_holding_pct = models.FloatField(null=True, blank=True)
+    retail_holding_pct = models.FloatField(null=True, blank=True)
+
+    # Quarterly Financial Performance (Profit & Loss)
+    quarterly_net_profit_crores = models.FloatField(null=True, blank=True)
+    quarterly_revenue_crores = models.FloatField(null=True, blank=True)
+    quarterly_profit_growth_yoy = models.FloatField(null=True, blank=True)
+    quarterly_revenue_growth_yoy = models.FloatField(null=True, blank=True)
+    is_quarterly_profitable = models.BooleanField(default=True)
+
     operating_margin_pct = models.FloatField(null=True, blank=True)
     profit_margin_pct = models.FloatField(null=True, blank=True)
     industry_pe = models.FloatField(null=True, blank=True)
@@ -184,6 +193,15 @@ class AIPrediction(models.Model):
     pe_at_prediction = models.FloatField(null=True, blank=True)
     pb_at_prediction = models.FloatField(null=True, blank=True)
     book_value_at_prediction = models.FloatField(null=True, blank=True)
+
+    # Shareholding & Quarterly Financial Performance Snapshot
+    promoter_holding_at_prediction = models.FloatField(null=True, blank=True)
+    fii_holding_at_prediction = models.FloatField(null=True, blank=True)
+    dii_holding_at_prediction = models.FloatField(null=True, blank=True)
+    retail_holding_at_prediction = models.FloatField(null=True, blank=True)
+    quarterly_profit_crores_at_prediction = models.FloatField(null=True, blank=True)
+    quarterly_growth_at_prediction = models.FloatField(null=True, blank=True)
+    is_quarterly_profitable_at_prediction = models.BooleanField(default=True)
 
     # News Trading & Sentiment Impact
     news_score = models.IntegerField(default=50) # 0 to 100
