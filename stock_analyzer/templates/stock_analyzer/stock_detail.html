@@ -64,13 +64,17 @@
           🤖 AI Prediction & Target Card
         </h2>
         {% if prediction.action == 'STRONG_BUY' %}
-        <span class="badge badge-strong-buy">STRONG BUY</span>
+        <span class="badge badge-strong-buy">STRONG BUY 🟢</span>
         {% elif prediction.action == 'ACCUMULATE' %}
-        <span class="badge badge-accumulate">ACCUMULATE</span>
+        <span class="badge badge-accumulate">ACCUMULATE 🟢</span>
+        {% elif prediction.action == 'STRONG_SELL' %}
+        <span class="badge badge-strong-sell">STRONG SELL 🔴</span>
+        {% elif prediction.action == 'SELL' %}
+        <span class="badge badge-sell">SELL / SHORT 🔴</span>
         {% elif prediction.action == 'HOLD' %}
-        <span class="badge badge-hold">HOLD / WAIT</span>
+        <span class="badge badge-hold">HOLD / WAIT 🟡</span>
         {% else %}
-        <span class="badge badge-avoid">AVOID</span>
+        <span class="badge badge-avoid">AVOID ⚪</span>
         {% endif %}
       </div>
 
@@ -85,7 +89,7 @@
         </div>
       </div>
 
-      <!-- Price Target & Stop-Loss Box -->
+      <!-- Price Target & Stop-Loss Box (Direction-Aware) -->
       <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem;">
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; font-family: var(--font-mono);">
           <div>
@@ -93,12 +97,22 @@
             <div style="font-size: 1.1rem; font-weight: 700; color: #fff;">₹{{ prediction.entry_price|floatformat:1 }}</div>
           </div>
           <div>
+            {% if prediction.direction == 'BEARISH' %}
+            <div style="font-size: 0.72rem; color: #fb7185;">DOWNSIDE TARGET (-{{ prediction.expected_return_pct }}%)</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: #fb7185;">₹{{ prediction.target_price|floatformat:1 }}</div>
+            {% else %}
             <div style="font-size: 0.72rem; color: var(--text-dim);">TARGET (+{{ prediction.expected_return_pct }}%)</div>
             <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">₹{{ prediction.target_price|floatformat:1 }}</div>
+            {% endif %}
           </div>
           <div>
+            {% if prediction.direction == 'BEARISH' %}
+            <div style="font-size: 0.72rem; color: var(--text-dim);">PROTECTIVE SL (+{{ prediction.max_risk_pct }}%)</div>
+            <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-rose);">₹{{ prediction.stop_loss_price|floatformat:1 }}</div>
+            {% else %}
             <div style="font-size: 0.72rem; color: var(--text-dim);">STOP LOSS (-{{ prediction.max_risk_pct }}%)</div>
             <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent-rose);">₹{{ prediction.stop_loss_price|floatformat:1 }}</div>
+            {% endif %}
           </div>
         </div>
 
@@ -108,11 +122,29 @@
         </div>
       </div>
 
+      <!-- Multi-Strategy Confluence Signals Breakdown -->
+      {% if prediction.trend_signal %}
+      <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--accent-cyan); letter-spacing: 0.05em; margin-bottom: 0.65rem; display: flex; justify-content: space-between;">
+          <span>📊 Strategy Signals Breakdown</span>
+          <span>🟢 {{ prediction.bullish_signals_count }} Bull | 🔴 {{ prediction.bearish_signals_count }} Bear</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; font-size: 0.76rem;">
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">TREND</span> <strong>{{ prediction.trend_signal }}</strong></div>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">MOMENTUM</span> <strong>{{ prediction.momentum_signal }}</strong></div>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">SMART MONEY</span> <strong>{{ prediction.smart_money_signal }}</strong></div>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">FUNDAMENTAL</span> <strong>{{ prediction.fundamental_signal }}</strong></div>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">NEWS</span> <strong>{{ prediction.news_signal }}</strong></div>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.4rem; border-radius: 6px;"><span style="color: var(--text-dim); display: block; font-size: 0.68rem;">STAGE</span> <strong>{{ prediction.stage_signal }}</strong></div>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Live Distance Progress -->
       <div style="background: rgba(15, 23, 42, 0.6); padding: 0.85rem; border-radius: 10px; font-size: 0.85rem; margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
-          <span style="color: var(--text-muted);">Distance to Target:</span>
-          <strong id="liveTargetDist" style="color: var(--accent-green);">{{ target_dist_pct }}% away</strong>
+          <span style="color: var(--text-muted);">{% if prediction.direction == 'BEARISH' %}Distance to Downside Target:{% else %}Distance to Target:{% endif %}</span>
+          <strong id="liveTargetDist" style="color: {% if prediction.direction == 'BEARISH' %}#fb7185{% else %}var(--accent-green){% endif %};">{{ target_dist_pct }}% away</strong>
         </div>
         <div style="display: flex; justify-content: space-between;">
           <span style="color: var(--text-muted);">Safety Buffer to Stop-Loss:</span>

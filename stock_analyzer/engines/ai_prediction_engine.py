@@ -216,6 +216,7 @@ def generate_ai_stock_prediction(
     ) - lesson_penalty
 
     # News Sentiment Boost or Penalty
+    # News Sentiment Boost or Penalty
     if news_sentiment_score >= 0.25:
         raw_composite += 6  # Good News tailwind
     elif news_sentiment_score <= -0.25:
@@ -223,68 +224,178 @@ def generate_ai_stock_prediction(
 
     confidence_score = max(min(int(raw_composite), 95), 20)
 
-    # Action Matrix, Fundamental Pre-Prediction Circuit Breakers & News Filter
-    if is_profitable is False and q_profit is not None and q_profit < 0:
-        # Strict William O'Neil CAN SLIM 'C' Rule: NEVER buy unprofitable companies
-        action = "AVOID"
-        reason_flag = f"Quarterly Net Loss Warning: Operating at net loss of -₹{abs(q_profit):,.1f} Cr. William O'Neil CAN SLIM 'C' rule strictly blocks fresh buy calls on loss-making quarters."
-        confidence_score = min(confidence_score, 38)
-    elif retail > 55.0 and inst_holding < 20.0:
-        action = "AVOID"
-        reason_flag = f"Retail Distribution Risk: Retailers own {retail:.1f}% vs institutions {inst_holding:.1f}%. High panic dump risk."
-        confidence_score = min(confidence_score, 42)
-    elif news_sentiment_score <= -0.35:
-        # Severe Negative News Override: Protect capital against regulatory probes / fraud / earnings crash
-        action = "AVOID"
-        reason_flag = f"Negative News Alert: Adverse media coverage ({news_label}) overrides technical indicators."
-    elif not mandatory_passed:
-        action = "HOLD"
-        reason_flag = f"Mandatory Book Rules not fully satisfied ({', '.join(book_eval['failed_mandatory_rules'])})."
-    elif confidence_score >= 78 and technical_score >= 65 and news_sentiment_score >= -0.10:
+    # 7. Evaluate 6 Strategic Indicators for Transparent Confluence Voting
+    # 1. Trend Structure
+    if current_price > ema50 > ema200:
+        trend_signal = "BULLISH 🟢"
+        t_vote = 1
+    elif current_price < ema50 < ema200 or current_price < ema200:
+        trend_signal = "BEARISH 🔴"
+        t_vote = -1
+    else:
+        trend_signal = "NEUTRAL 🟡"
+        t_vote = 0
+
+    # 2. Momentum (RSI & MACD)
+    if rsi >= 50 and macd_hist > 0:
+        momentum_signal = "BULLISH 🟢"
+        m_vote = 1
+    elif rsi < 45 and macd_hist < 0:
+        momentum_signal = "BEARISH 🔴"
+        m_vote = -1
+    elif rsi > 70:
+        momentum_signal = "OVERBOUGHT ⚠️"
+        m_vote = 0
+    elif rsi < 35:
+        momentum_signal = "OVERSOLD ⚠️"
+        m_vote = 0
+    else:
+        momentum_signal = "NEUTRAL 🟡"
+        m_vote = 0
+
+    # 3. Smart Money / Mutual Funds
+    sm_sig = smart_money.get("signal", "")
+    if "Accumulation" in sm_sig:
+        smart_money_signal = "INFLOW 🟢"
+        sm_vote = 1
+    elif "Trimming" in sm_sig or "Distribution" in sm_sig:
+        smart_money_signal = "OUTFLOW 🔴"
+        sm_vote = -1
+    else:
+        smart_money_signal = "HOLD ⚖️"
+        sm_vote = 0
+
+    # 4. Fundamental Health & CAN SLIM Earnings
+    if is_profitable and (q_growth is not None and q_growth >= 15.0):
+        fundamental_signal = "STRONG 🟢"
+        f_vote = 1
+    elif (is_profitable is False and q_profit is not None and q_profit < 0) or (q_growth is not None and q_growth < 0):
+        fundamental_signal = "WEAK 🔴"
+        f_vote = -1
+    else:
+        fundamental_signal = "STABLE 🟡"
+        f_vote = 0
+
+    # 5. News Sentiment
+    if news_sentiment_score >= 0.20:
+        news_signal = "BULLISH 🟢"
+        n_vote = 1
+    elif news_sentiment_score <= -0.20:
+        news_signal = "BEARISH 🔴"
+        n_vote = -1
+    else:
+        news_signal = "NEUTRAL 🟡"
+        n_vote = 0
+
+    # 6. Stan Weinstein Stage Analysis
+    if current_price > ema200 and ema50 > ema200:
+        stage_signal = "Stage 2 🟢"
+        st_vote = 1
+    elif current_price < ema200 and ema50 < ema200:
+        stage_signal = "Stage 4 🔴"
+        st_vote = -1
+    else:
+        stage_signal = "Stage 1/3 🟡"
+        st_vote = 0
+
+    # Tally Confluence Checks
+    bullish_signals_count = sum(1 for v in [t_vote, m_vote, sm_vote, f_vote, n_vote, st_vote] if v > 0)
+    bearish_signals_count = sum(1 for v in [t_vote, m_vote, sm_vote, f_vote, n_vote, st_vote] if v < 0)
+
+    # 8. Two-Way Directional Decision Matrix (Bullish vs Bearish vs Neutral)
+    direction = "NEUTRAL"
+
+    # CASE A: Strong Bearish Breakdown (Short / Sell)
+    # Triggered when multiple bearish pillars align: Stage 4 / Below 200 EMA + negative news / earnings / momentum
+    if (bearish_signals_count >= 3 and bullish_signals_count <= 1) or (
+        st_vote == -1 and t_vote == -1 and (n_vote == -1 or f_vote == -1 or m_vote == -1)
+    ):
+        direction = "BEARISH"
+        action = "STRONG_SELL" if bearish_signals_count >= 3 else "SELL"
+        reason_flag = (
+            f"Bearish Breakdown Confirmed: Stock entered Stage 4 breakdown below key EMAs with "
+            f"{bearish_signals_count} bearish confirmations (Weak Fundamentals/Earnings, Adverse News, or Momentum Drop)."
+        )
+        confidence_score = max(int(65 + (bearish_signals_count * 8)), 75)
+
+    # CASE B: Strong Bullish Confluence (Long / Buy)
+    elif mandatory_passed and bullish_signals_count >= 3 and bearish_signals_count == 0:
+        direction = "BULLISH"
         action = "STRONG_BUY"
         reason_flag = "High institutional consensus, favorable news sentiment, and confirmed Stage 2 trend alignment."
-    elif confidence_score >= 65 and news_sentiment_score >= -0.15:
+        confidence_score = max(confidence_score, 80)
+
+    elif mandatory_passed and bullish_signals_count >= 2 and bearish_signals_count <= 1 and confidence_score >= 65:
+        direction = "BULLISH"
         action = "ACCUMULATE"
-        reason_flag = "Solid mutual fund backing, attractive P/E and Book Value, and healthy news backdrop."
+        reason_flag = "Solid mutual fund backing, Stage 2 support, and healthy fundamentals."
+
+    # CASE C: Severe Single Red Flag (Avoid)
+    elif is_profitable is False and q_profit is not None and q_profit < 0 and bearish_signals_count >= 2:
+        direction = "BEARISH"
+        action = "STRONG_SELL"
+        reason_flag = f"Quarterly Net Loss Warning: -₹{abs(q_profit):,.1f} Cr loss with technical breakdown. High downside risk."
+    elif retail > 55.0 and inst_holding < 20.0:
+        direction = "NEUTRAL"
+        action = "AVOID"
+        reason_flag = f"Retail Distribution Risk: Retailers own {retail:.1f}% vs institutions {inst_holding:.1f}%. Panic dump risk."
+        confidence_score = min(confidence_score, 42)
+    elif not mandatory_passed:
+        direction = "NEUTRAL"
+        action = "HOLD"
+        reason_flag = f"Mandatory Book Rules not fully satisfied ({', '.join(book_eval['failed_mandatory_rules'])})."
     elif confidence_score >= 48:
+        direction = "NEUTRAL"
         action = "HOLD"
         reason_flag = "Consolidating in base range; wait for decisive volume breakout before adding fresh positions."
     else:
-        action = "AVOID"
-        reason_flag = "Downtrend structure, negative news, or lack of institutional support."
+        direction = "BEARISH" if bearish_signals_count > bullish_signals_count else "NEUTRAL"
+        action = "SELL" if direction == "BEARISH" else "AVOID"
+        reason_flag = "Downtrend structure or lack of institutional support."
 
-    # 8. Asymmetric Risk Management (Disciplined 1:3 Risk-to-Reward Ratio)
+    # 9. Directional Risk Management (Disciplined 1:3 Risk-to-Reward Ratio)
     if timeframe_type == "DAILY":
         timeframe_days = 1
-        # Next-day intraday buffer (min 1.0% buffer)
         stop_buffer = round(max(atr * 0.75, current_price * 0.01), 2)
         horizon_title = "Next-Day (Daily) ⚡"
     elif timeframe_type == "WEEKLY":
         timeframe_days = 5
-        # 1-week swing buffer (min 2.0% buffer)
         stop_buffer = round(max(atr * 1.5, current_price * 0.02), 2)
         horizon_title = "Weekly (Swing) 📅"
     else:  # MONTHLY
         timeframe_days = 20
-        # 1-month position buffer (min 3.5% buffer)
-        stop_buffer = round(max(atr * 2.5, current_price * 0.035, current_price - (ema50 * 0.99)), 2)
+        stop_buffer = round(max(atr * 2.5, current_price * 0.035), 2)
         horizon_title = "Monthly (Position) 🗓️"
 
-    # Strictly 3.0x Risk Buffer (1:3 RR)
     target_buffer = round(stop_buffer * 3.0, 2)
-    stop_loss_price = round(current_price - stop_buffer, 2)
-    target_price = round(current_price + target_buffer, 2)
 
-    expected_return_pct = round(((target_price - current_price) / current_price) * 100, 2)
-    max_risk_pct = round(((current_price - stop_loss_price) / current_price) * 100, 2)
+    # DIRECTION-AWARE TARGETS & STOPS:
+    # Bullish: Target is ABOVE CMP, Stop Loss is BELOW CMP
+    # Bearish (Short): Target is BELOW CMP, Stop Loss is ABOVE CMP (protecting short position)
+    if direction == "BEARISH":
+        target_price = round(max(current_price - target_buffer, 1.0), 2)
+        stop_loss_price = round(current_price + stop_buffer, 2)
+        expected_return_pct = round(((current_price - target_price) / current_price) * 100, 2)
+        max_risk_pct = round(((stop_loss_price - current_price) / current_price) * 100, 2)
+    else:
+        target_price = round(current_price + target_buffer, 2)
+        stop_loss_price = round(max(current_price - stop_buffer, 1.0), 2)
+        expected_return_pct = round(((target_price - current_price) / current_price) * 100, 2)
+        max_risk_pct = round(((current_price - stop_loss_price) / current_price) * 100, 2)
+
     risk_reward_ratio = 3.0 # Exact 1:3 Risk-Reward Ratio
 
-    # 30-Day Monthly Target Horizons Reference (also maintaining 1:3 RR)
-    monthly_stop_buffer = round(max(atr * 2.5, current_price * 0.035, current_price - (ema50 * 0.99)), 2)
+    # 30-Day Monthly Target Horizons Reference
+    monthly_stop_buffer = round(max(atr * 2.5, current_price * 0.035), 2)
     monthly_target_buffer = round(monthly_stop_buffer * 3.0, 2)
-    monthly_target_price = round(current_price + monthly_target_buffer, 2)
-    monthly_stop_loss_price = round(current_price - monthly_stop_buffer, 2)
-    monthly_expected_return_pct = round(((monthly_target_price - current_price) / current_price) * 100, 2)
+    if direction == "BEARISH":
+        monthly_target_price = round(max(current_price - monthly_target_buffer, 1.0), 2)
+        monthly_stop_loss_price = round(current_price + monthly_stop_buffer, 2)
+        monthly_expected_return_pct = round(((current_price - monthly_target_price) / current_price) * 100, 2)
+    else:
+        monthly_target_price = round(current_price + monthly_target_buffer, 2)
+        monthly_stop_loss_price = round(max(current_price - monthly_stop_buffer, 1.0), 2)
+        monthly_expected_return_pct = round(((monthly_target_price - current_price) / current_price) * 100, 2)
 
     # Check Upcoming Earnings Catalyst & Event Risk (Minervini & O'Neil Rule)
     earnings_warning = None
@@ -297,37 +408,40 @@ def generate_ai_stock_prediction(
             f"Revenue Forecast: ₹{stock.revenue_estimate_crores:,.0f} Cr. "
             f"Per Minervini SEPA rules, AI tightens stop buffer to mitigate binary earnings gap risk."
         )
-        # Moderate confidence to prevent binary roulette trap
         confidence_score = max(confidence_score - 6, 25)
         if action == "STRONG_BUY":
             action = "ACCUMULATE"
 
-    # 9. Detailed AI Thesis Generation
+    # 10. Detailed AI Thesis Generation
     news_text = f"• **News Sentiment & Catalysts**: {news_label} (Score: {news_score}/100). {stock.news_sentiment_summary or 'No major headwinds.'}\n"
     if news_headline:
         news_text += f"   *Latest Headline*: \"{news_headline}\"\n"
 
-    # Format Quarterly Profit & Shareholding summary for Thesis
     profit_desc = f"Net Profit: ₹{q_profit:,.1f} Cr ({'Profitable ✅' if is_profitable else 'Loss-Making ❌'})" if q_profit is not None else "Profitable Base"
     growth_desc = f" | YoY Profit Growth: {q_growth:+.1f}%" if q_growth is not None else ""
     rev_desc = f" | Revenue: ₹{q_rev:,.1f} Cr" if q_rev is not None else ""
 
+    direction_badge = "🟢 LONG BUY" if direction == "BULLISH" else ("🔴 SHORT SELL" if direction == "BEARISH" else "🟡 NEUTRAL WATCH")
+
     ai_thesis = (
-        f"**Master Strategy Thesis for {stock.name} ({stock.symbol}) — [{horizon_title}]**\n\n"
+        f"**Master Strategy Thesis for {stock.name} ({stock.symbol}) — [{horizon_title} | {direction_badge}]**\n\n"
+        f"• **Multi-Strategy Confluence**: 🟢 {bullish_signals_count} Bullish vs 🔴 {bearish_signals_count} Bearish Checkmarks.\n"
+        f"   - Trend: {trend_signal} | Momentum: {momentum_signal} | Stage: {stage_signal}\n"
+        f"   - Smart Money: {smart_money_signal} | Fundamentals: {fundamental_signal} | News: {news_signal}\n"
         f"• **Smart Money Signal**: {smart_money['signal']} with ₹{smart_money['total_capital_crores']:,.0f} Cr "
         f"invested across {smart_money['total_funds_holding']} top-tier mutual funds.\n"
         f"• **Shareholding Structure**: Promoters: {promoter:.1f}% | Foreign Investors (FII): {fii:.1f}% | "
         f"Mutual Funds / DII: {dii:.1f}% | Retailers: {retail:.1f}%.\n"
         f"• **Quarterly P&L Performance**: {profit_desc}{growth_desc}{rev_desc} (O'Neil CAN SLIM 'C' Verified).\n"
-        f"• **Trading Books Consensus**: {book_eval['overall_score']}% score across Minervini, O'Neil CAN SLIM, "
+        f"• **Trading Books Consensus**: {book_eval['overall_score']}% compliance across Minervini, O'Neil CAN SLIM, "
         f"and Weinstein Stage 2 frameworks ({book_eval['current_stage']}).\n"
         f"• **Valuation & Fundamentals**: P/E of {pe:.1f} vs Industry P/E {ind_pe:.1f}. "
         f"Book Value ₹{book_val:,.1f} (P/B: {pb:.1f}x) with {roe:.1f}% ROE and {stock.piotroski_score}/9 Piotroski score.\n"
         f"{news_text}"
         f"• **Technical Structure**: Price ₹{current_price:,.2f} relative to 50 EMA (₹{ema50:,.2f}) and 200 EMA (₹{ema200:,.2f}). "
-        f"RSI is at {rsi:.1f} with MACD momentum positive.\n"
+        f"RSI is at {rsi:.1f} with MACD histogram at {macd_hist:+.2f}.\n"
         f"• **Disciplined 1:3 Risk Management [{horizon_title}]**:\n"
-        f"   - Target: 🎯 ₹{target_price:,.2f} (+{expected_return_pct}%) | Stop-Loss: 🛑 ₹{stop_loss_price:,.2f} (-{max_risk_pct}%).\n"
+        f"   - Planned Entry: ₹{current_price:,.2f} | Target: 🎯 ₹{target_price:,.2f} ({expected_return_pct:+.1f}%) | Stop-Loss: 🛑 ₹{stop_loss_price:,.2f} ({max_risk_pct:+.1f}%).\n"
         f"   - Risk ₹{stop_buffer:,.2f} to make ₹{target_buffer:,.2f} (Strict 1:3 Risk-to-Reward Ratio)."
     )
 
@@ -337,7 +451,7 @@ def generate_ai_stock_prediction(
     if lesson_notes:
         ai_thesis += f"\n\n🛡️ *Self-Learning Safeguard*: {' '.join(lesson_notes)}"
 
-    # 10. Ensure single active prediction per stock per timeframe (expire older active of this timeframe)
+    # 11. Ensure single active prediction per stock per timeframe (expire older active of this timeframe)
     AIPrediction.objects.filter(stock=stock, timeframe_type=timeframe_type, status="ACTIVE").update(status="EXPIRED")
 
     # Create and Save Prediction
@@ -345,6 +459,7 @@ def generate_ai_stock_prediction(
         stock=stock,
         prediction_date=today,
         timeframe_type=timeframe_type,
+        direction=direction,
         action=action,
         entry_price=round(current_price, 2),
         target_price=target_price,
@@ -353,6 +468,14 @@ def generate_ai_stock_prediction(
         max_risk_pct=max_risk_pct,
         risk_reward_ratio=risk_reward_ratio,
         timeframe_days=timeframe_days,
+        trend_signal=trend_signal,
+        momentum_signal=momentum_signal,
+        smart_money_signal=smart_money_signal,
+        fundamental_signal=fundamental_signal,
+        news_signal=news_signal,
+        stage_signal=stage_signal,
+        bullish_signals_count=bullish_signals_count,
+        bearish_signals_count=bearish_signals_count,
         monthly_target_price=monthly_target_price,
         monthly_expected_return_pct=monthly_expected_return_pct,
         monthly_stop_loss_price=monthly_stop_loss_price,
@@ -370,7 +493,7 @@ def generate_ai_stock_prediction(
         news_sentiment=news_label,
         news_headline=news_headline[:350] if news_headline else "",
         confidence_score=confidence_score,
-        strategy_used="Minervini Trend, Smart Money & News Sentiment Ensemble",
+        strategy_used="Multi-Strategy Confluence (Minervini, Weinstein, CAN SLIM, Smart Money)",
         ai_thesis=ai_thesis,
         technical_score=technical_score,
         fundamental_score=fundamental_score,
@@ -380,6 +503,88 @@ def generate_ai_stock_prediction(
     )
 
     return prediction
+
+
+def get_multi_strategy_confluence_matrix(stocks=None) -> list:
+    """
+    Evaluates and formats the comprehensive Multi-Strategy Confluence Matrix
+    across all tracked stocks, showing individual check results (Trend, Momentum,
+    Smart Money, Fundamentals, News, Stage) side-by-side with the final decision.
+    """
+    if stocks is None:
+        stocks = Stock.objects.all().order_by("symbol")
+
+    matrix = []
+    for stock in stocks:
+        pred = AIPrediction.objects.filter(stock=stock, timeframe_type="DAILY", status="ACTIVE").order_by("-id").first()
+        if not pred:
+            try:
+                pred = generate_ai_stock_prediction(stock, timeframe_type="DAILY")
+            except Exception:
+                pred = None
+
+        cmp = stock.current_price or 100.0
+
+        if pred:
+            direction = pred.direction
+            action = pred.action
+            action_display = pred.get_action_display()
+            trend_sig = pred.trend_signal
+            mom_sig = pred.momentum_signal
+            sm_sig = pred.smart_money_signal
+            fund_sig = pred.fundamental_signal
+            news_sig = pred.news_signal
+            stage_sig = pred.stage_signal
+            bull_cnt = pred.bullish_signals_count
+            bear_cnt = pred.bearish_signals_count
+            tgt = pred.target_price
+            sl = pred.stop_loss_price
+            exp_ret = pred.expected_return_pct
+            max_risk = pred.max_risk_pct
+            conf = pred.confidence_score
+        else:
+            direction = "NEUTRAL"
+            action = "HOLD"
+            action_display = "HOLD / WAIT 🟡"
+            trend_sig = "NEUTRAL 🟡"
+            mom_sig = "NEUTRAL 🟡"
+            sm_sig = "HOLD ⚖️"
+            fund_sig = "STABLE 🟡"
+            news_sig = "NEUTRAL 🟡"
+            stage_sig = "Stage 1/3 🟡"
+            bull_cnt = 1
+            bear_cnt = 1
+            tgt = cmp * 1.05
+            sl = cmp * 0.98
+            exp_ret = 5.0
+            max_risk = 2.0
+            conf = 50
+
+        matrix.append({
+            "stock": stock,
+            "symbol": stock.symbol,
+            "name": stock.name,
+            "sector": stock.sector,
+            "cmp": cmp,
+            "direction": direction,
+            "action": action,
+            "action_display": action_display,
+            "trend_signal": trend_sig,
+            "momentum_signal": mom_sig,
+            "smart_money_signal": sm_sig,
+            "fundamental_signal": fund_sig,
+            "news_signal": news_sig,
+            "stage_signal": stage_sig,
+            "bullish_signals_count": bull_cnt,
+            "bearish_signals_count": bear_cnt,
+            "target_price": tgt,
+            "stop_loss_price": sl,
+            "expected_return_pct": exp_ret,
+            "max_risk_pct": max_risk,
+            "confidence_score": conf,
+        })
+
+    return matrix
 
 
 def generate_all_timeframe_predictions(stock: Stock, force_new: bool = False, as_of_date=None) -> dict:

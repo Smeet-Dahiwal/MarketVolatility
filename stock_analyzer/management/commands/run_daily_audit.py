@@ -12,13 +12,28 @@ from stock_analyzer.engines.notifier_engine import send_telegram_alert
 class Command(BaseCommand):
     help = "Automated End-of-Day (4:00 PM IST) Stock Market Verification & Prediction Audit"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Force regeneration of all active predictions across Daily, Weekly, and Monthly cycles."
+        )
+
     def handle(self, *args, **options):
+        import sys
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
         self.stdout.write(self.style.SUCCESS("=" * 70))
         self.stdout.write(self.style.SUCCESS("  STARTING AUTOMATED DAILY VERIFICATION AUDIT (BULLGUARD.AI)"))
         self.stdout.write(self.style.SUCCESS("=" * 70))
 
         today_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S IST")
         self.stdout.write(f"Timestamp: {today_str}")
+
+        force_refresh = options.get("force", False)
 
         # 1. Update Market Benchmarks & Regime
         benchmarks = get_market_benchmarks()
@@ -32,7 +47,7 @@ class Command(BaseCommand):
             try:
                 fetch_or_update_stock(stock.symbol, force_refresh=True)
                 updated_count += 1
-                time.sleep(1.2)  # Pacing to avoid IP throttling in cloud runners
+                time.sleep(0.5)  # Pacing to avoid IP throttling in cloud runners
             except Exception as e:
                 self.stdout.write(self.style.WARNING(f"  Warning updating {stock.symbol}: {e}"))
 
@@ -47,9 +62,11 @@ class Command(BaseCommand):
         new_preds_count = 0
         for stock in stocks:
             for tf in ["DAILY", "WEEKLY", "MONTHLY"]:
-                if not AIPrediction.objects.filter(stock=stock, timeframe_type=tf, status="ACTIVE").exists():
+                existing = AIPrediction.objects.filter(stock=stock, timeframe_type=tf, status="ACTIVE").first()
+                needs_gen = force_refresh or (existing is None) or (not existing.trend_signal)
+                if needs_gen:
                     try:
-                        generate_ai_stock_prediction(stock, timeframe_type=tf)
+                        generate_ai_stock_prediction(stock, timeframe_type=tf, force_new=True)
                         new_preds_count += 1
                     except Exception as e:
                         self.stdout.write(self.style.WARNING(f"  Warning generating {tf} prediction for {stock.symbol}: {e}"))
@@ -61,18 +78,29 @@ class Command(BaseCommand):
         completed_preds = AIPrediction.objects.exclude(status="ACTIVE")
         total_wins = completed_preds.filter(status="TARGET_HIT").count()
         total_losses = completed_preds.filter(status="STOP_LOSS_HIT").count()
-        total_completed = completed_preds.count()
-        win_rate = round((total_wins / total_completed * 100), 1) if total_completed > 0 else 75.0
+        total_expired = completed_preds.filter(status="EXPIRED").count()
+        decided_trades = total_wins + total_losses
+        actionable_win_rate = round((total_wins / decided_trades * 100), 1) if decided_trades > 0 else 75.0
+
+        # Market Breadth Calculation
+        active_daily = AIPrediction.objects.filter(timeframe_type="DAILY", status="ACTIVE")
+        bullish_count = active_daily.filter(action__in=["STRONG_BUY", "ACCUMULATE"]).count()
+        bearish_count = active_daily.filter(action__in=["STRONG_SELL", "SELL"]).count()
+        neutral_count = active_daily.exclude(action__in=["STRONG_BUY", "ACCUMULATE", "STRONG_SELL", "SELL"]).count()
 
         summary = {
             "execution_time": today_str,
             "stocks_updated": updated_count,
             "market_regime": benchmarks.get("market_regime"),
             "active_predictions": active_preds,
-            "total_completed": total_completed,
+            "bullish_calls_count": bullish_count,
+            "bearish_calls_count": bearish_count,
+            "neutral_calls_count": neutral_count,
+            "total_completed": completed_preds.count(),
             "wins": total_wins,
             "losses": total_losses,
-            "win_rate_percentage": win_rate,
+            "expired": total_expired,
+            "actionable_win_rate_percentage": actionable_win_rate,
             "status": "SUCCESS"
         }
 
@@ -91,14 +119,16 @@ class Command(BaseCommand):
 
             audits = PredictionAudit.objects.filter(prediction__stock=stock)
             s_wins = audits.filter(is_successful=True).count()
-            s_total = audits.count()
-            s_win_rate = round((s_wins / s_total * 100), 1) if s_total > 0 else round(float(primary_pred.confidence_score if primary_pred else 72.0), 1)
+            s_losses = audits.filter(is_successful=False).count()
+            s_decided = s_wins + s_losses
+            s_win_rate = round((s_wins / s_decided * 100), 1) if s_decided > 0 else round(float(primary_pred.confidence_score if primary_pred else 72.0), 1)
 
             stock_items.append({
                 "symbol": stock.symbol,
                 "name": stock.name,
                 "action": primary_pred.action if primary_pred else "HOLD",
                 "action_label": primary_pred.get_action_display() if primary_pred else "HOLD / WAIT 🟡",
+                "direction": primary_pred.direction if primary_pred else "NEUTRAL",
                 "current_price": stock.current_price,
                 # Next-Day (Daily)
                 "daily_target_price": daily_pred.target_price if daily_pred else None,
@@ -115,6 +145,11 @@ class Command(BaseCommand):
                 "monthly_stop_loss_price": monthly_pred.stop_loss_price if monthly_pred else (primary_pred.monthly_stop_loss_price if primary_pred else None),
                 "monthly_expected_return_pct": monthly_pred.expected_return_pct if monthly_pred else (primary_pred.monthly_expected_return_pct if primary_pred else None),
                 "risk_reward_ratio": 3.0,
+                "trend_signal": primary_pred.trend_signal if primary_pred else "NEUTRAL 🟡",
+                "momentum_signal": primary_pred.momentum_signal if primary_pred else "NEUTRAL 🟡",
+                "smart_money_signal": primary_pred.smart_money_signal if primary_pred else "HOLD ⚖️",
+                "bullish_signals_count": primary_pred.bullish_signals_count if primary_pred else 0,
+                "bearish_signals_count": primary_pred.bearish_signals_count if primary_pred else 0,
                 "pe_ratio": stock.pe_ratio,
                 "pb_ratio": stock.pb_ratio,
                 "book_value": stock.book_value,
@@ -126,7 +161,7 @@ class Command(BaseCommand):
                 "news_sentiment": stock.news_sentiment_label,
                 "confidence_score": primary_pred.confidence_score if primary_pred else 75,
                 "win_rate": s_win_rate,
-                "trades_count": s_total
+                "trades_count": s_decided
             })
 
         # 7. Dispatch Comprehensive Telegram Alert
@@ -143,6 +178,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("  Telegram notification not delivered (ensure bot is added to group as admin)."))
 
         self.stdout.write(self.style.SUCCESS("=" * 70))
-        self.stdout.write(self.style.SUCCESS(f"  AUDIT COMPLETED! Win Rate: {win_rate}% | Active Calls: {active_preds}"))
+        self.stdout.write(self.style.SUCCESS(f"  AUDIT COMPLETED! Win Rate: {actionable_win_rate}% | Active Calls: {active_preds}"))
+        self.stdout.write(self.style.SUCCESS(f"  Breadth: [BULLISH: {bullish_count}] | [BEARISH: {bearish_count}] | [NEUTRAL: {neutral_count}]"))
         self.stdout.write(self.style.SUCCESS("  Saved audit_summary.json"))
         self.stdout.write(self.style.SUCCESS("=" * 70))

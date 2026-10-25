@@ -152,11 +152,19 @@ class TradingBookRule(models.Model):
 
 
 class AIPrediction(models.Model):
+    DIRECTION_CHOICES = [
+        ("BULLISH", "Bullish (Long) 🟢"),
+        ("BEARISH", "Bearish (Short) 🔴"),
+        ("NEUTRAL", "Neutral / Hold 🟡"),
+    ]
+
     ACTION_CHOICES = [
         ("STRONG_BUY", "STRONG BUY 🟢"),
         ("ACCUMULATE", "ACCUMULATE 📈"),
         ("HOLD", "HOLD / WAIT 🟡"),
-        ("AVOID", "AVOID 🔴"),
+        ("SELL", "SELL / WEAK 📉"),
+        ("STRONG_SELL", "STRONG SELL / SHORT 🔴"),
+        ("AVOID", "AVOID ⛔"),
     ]
 
     STATUS_CHOICES = [
@@ -175,6 +183,7 @@ class AIPrediction(models.Model):
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE, related_name="predictions")
     prediction_date = models.DateField(db_index=True)
     timeframe_type = models.CharField(max_length=20, choices=TIMEFRAME_CHOICES, default="DAILY", db_index=True)
+    direction = models.CharField(max_length=20, choices=DIRECTION_CHOICES, default="BULLISH", db_index=True)
     action = models.CharField(max_length=30, choices=ACTION_CHOICES, default="STRONG_BUY")
     entry_price = models.FloatField()
     target_price = models.FloatField()
@@ -183,6 +192,16 @@ class AIPrediction(models.Model):
     max_risk_pct = models.FloatField()
     risk_reward_ratio = models.FloatField(default=3.0) # Disciplined 1:3 Risk-to-Reward Ratio
     timeframe_days = models.IntegerField(default=1) # 1 for Daily, 5 for Weekly, 20 for Monthly
+
+    # Multi-Strategy Indicator Confluence Signals (Individual Breakdown)
+    trend_signal = models.CharField(max_length=20, default="NEUTRAL")
+    momentum_signal = models.CharField(max_length=20, default="NEUTRAL")
+    smart_money_signal = models.CharField(max_length=20, default="NEUTRAL")
+    fundamental_signal = models.CharField(max_length=20, default="NEUTRAL")
+    news_signal = models.CharField(max_length=20, default="NEUTRAL")
+    stage_signal = models.CharField(max_length=20, default="Stage 1/3")
+    bullish_signals_count = models.IntegerField(default=0)
+    bearish_signals_count = models.IntegerField(default=0)
     
     # 30-Day Monthly Target Horizons
     monthly_target_price = models.FloatField(null=True, blank=True)

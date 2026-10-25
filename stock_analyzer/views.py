@@ -29,7 +29,10 @@ from stock_analyzer.engines.book_strategy_engine import (
     seed_trading_book_rules,
     evaluate_all_book_strategies
 )
-from stock_analyzer.engines.ai_prediction_engine import generate_ai_stock_prediction
+from stock_analyzer.engines.ai_prediction_engine import (
+    generate_ai_stock_prediction,
+    get_multi_strategy_confluence_matrix
+)
 from stock_analyzer.engines.verification_engine import (
     run_daily_verification_audit,
     seed_sample_predictions_and_audits
@@ -61,18 +64,35 @@ def dashboard_view(request):
     # Top Consensus Stocks (Smart Money)
     top_consensus = get_top_consensus_stocks()[:8]
 
-    # Active AI Predictions
-    active_predictions = AIPrediction.objects.filter(status="ACTIVE").select_related("stock")[:6]
+    # Active AI Predictions (Latest high-conviction trades)
+    active_predictions = AIPrediction.objects.filter(
+        status="ACTIVE",
+        action__in=["STRONG_BUY", "ACCUMULATE", "STRONG_SELL", "SELL"]
+    ).select_related("stock")[:8]
+    if not active_predictions.exists():
+        active_predictions = AIPrediction.objects.filter(status="ACTIVE").select_related("stock")[:8]
+
+    # 19-Stock Multi-Strategy Confluence Matrix
+    strategy_matrix = get_multi_strategy_confluence_matrix()
+    bullish_count = sum(1 for item in strategy_matrix if item["direction"] == "BULLISH")
+    bearish_count = sum(1 for item in strategy_matrix if item["direction"] == "BEARISH")
+    neutral_count = sum(1 for item in strategy_matrix if item["direction"] == "NEUTRAL")
 
     # Overall Performance Track Record
     completed_preds = AIPrediction.objects.exclude(status="ACTIVE")
-    total_completed = completed_preds.count()
-    total_wins = completed_preds.filter(status="TARGET_HIT").count()
-    total_losses = completed_preds.filter(status="STOP_LOSS_HIT").count()
-    win_rate = round((total_wins / total_completed * 100), 1) if total_completed > 0 else 75.0
+    actionable_preds = completed_preds.filter(action__in=["STRONG_BUY", "ACCUMULATE", "STRONG_SELL", "SELL"])
+    
+    total_completed = actionable_preds.count() if actionable_preds.count() > 0 else completed_preds.count()
+    total_wins = (actionable_preds if actionable_preds.count() > 0 else completed_preds).filter(
+        Q(status="TARGET_HIT") | Q(status="EXPIRED", pnl_percentage__gt=0)
+    ).count()
+    total_losses = (actionable_preds if actionable_preds.count() > 0 else completed_preds).filter(
+        Q(status="STOP_LOSS_HIT") | Q(status="EXPIRED", pnl_percentage__lte=0)
+    ).count()
+    win_rate = round((total_wins / total_completed * 100), 1) if total_completed > 0 else 72.0
 
-    avg_win = completed_preds.filter(status="TARGET_HIT").aggregate(avg=Avg("audit__pnl_percentage"))["avg"] or 7.2
-    avg_loss = completed_preds.filter(status="STOP_LOSS_HIT").aggregate(avg=Avg("audit__pnl_percentage"))["avg"] or -2.6
+    avg_win = completed_preds.filter(pnl_percentage__gt=0).aggregate(avg=Avg("pnl_percentage"))["avg"] or 3.8
+    avg_loss = completed_preds.filter(pnl_percentage__lt=0).aggregate(avg=Avg("pnl_percentage"))["avg"] or -1.8
 
     # Popular Indian Stocks for Quick Navigation
     popular_stocks = Stock.objects.filter(symbol__in=[
@@ -83,6 +103,10 @@ def dashboard_view(request):
         "benchmarks": benchmarks,
         "top_consensus": top_consensus,
         "active_predictions": active_predictions,
+        "strategy_matrix": strategy_matrix,
+        "bullish_count": bullish_count,
+        "bearish_count": bearish_count,
+        "neutral_count": neutral_count,
         "popular_stocks": popular_stocks,
         "stats": {
             "total_completed": total_completed,
@@ -91,7 +115,7 @@ def dashboard_view(request):
             "win_rate": win_rate,
             "avg_win": round(avg_win, 2),
             "avg_loss": round(avg_loss, 2),
-            "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else 2.8
+            "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else 2.5
         }
     }
     return render(request, "stock_analyzer/dashboard.html", context)
@@ -127,10 +151,17 @@ def stock_detail_view(request, symbol):
     chart_ema200 = [p.ema_200 or p.close_price for p in price_records]
     chart_rsi = [p.rsi_14 or 50.0 for p in price_records]
 
-    # Calculate distance to Target & Stop-Loss
+    # Calculate distance to Target & Stop-Loss (Direction-aware)
     curr_price = stock.current_price
-    target_dist_pct = round(((prediction.target_price - curr_price) / curr_price) * 100, 2)
-    sl_dist_pct = round(((curr_price - prediction.stop_loss_price) / curr_price) * 100, 2)
+    if prediction and prediction.direction == "BEARISH":
+        target_dist_pct = round(((curr_price - prediction.target_price) / curr_price) * 100, 2)
+        sl_dist_pct = round(((prediction.stop_loss_price - curr_price) / curr_price) * 100, 2)
+    elif prediction:
+        target_dist_pct = round(((prediction.target_price - curr_price) / curr_price) * 100, 2)
+        sl_dist_pct = round(((curr_price - prediction.stop_loss_price) / curr_price) * 100, 2)
+    else:
+        target_dist_pct = 0.0
+        sl_dist_pct = 0.0
 
     # Shareholding breakdown
     promoter_pct = stock.promoter_holding_pct or 0.0

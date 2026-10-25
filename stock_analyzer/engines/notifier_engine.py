@@ -62,81 +62,69 @@ def send_telegram_alert(
         f"• <b>Active Monitored Calls:</b> <code>{active_count}</code>",
     ]
 
-    actionable_stocks = []
+    bullish_stocks = []
+    bearish_stocks = []
     neutral_stocks = []
 
     if stock_items:
         for item in stock_items:
             action = item.get("action", "HOLD")
-            if action in ["STRONG_BUY", "ACCUMULATE", "AVOID"]:
-                actionable_stocks.append(item)
+            if action in ["STRONG_BUY", "ACCUMULATE"]:
+                bullish_stocks.append(item)
+            elif action in ["STRONG_SELL", "SELL"]:
+                bearish_stocks.append(item)
             else:
                 neutral_stocks.append(item)
 
     lines = list(header_lines)
 
-    # 1. Actionable Highlights (BUY / ACCUMULATE / AVOID)
-    if actionable_stocks:
+    # 1. High-Conviction Long Calls
+    if bullish_stocks:
         lines.append("")
-        lines.append("🎯 <b>HIGH-CONVICTION ACTION CALLS:</b>")
-        for idx, item in enumerate(actionable_stocks, start=1):
+        lines.append("🟢 <b>HIGH-CONVICTION BUY CALLS (LONG):</b>")
+        for idx, item in enumerate(bullish_stocks, start=1):
             sym = item.get("symbol", "").replace(".NS", "")
             action = item.get("action", "")
-            icon = "🟢" if "BUY" in action else ("📈" if action == "ACCUMULATE" else "🔴")
-            label = "STRONG BUY" if action == "STRONG_BUY" else ("ACCUMULATE" if action == "ACCUMULATE" else "AVOID")
+            label = "STRONG BUY" if action == "STRONG_BUY" else "ACCUMULATE"
             curr = f"₹{item.get('current_price', 0):,.0f}"
-            tgt_15d = f"₹{item.get('target_price', 0):,.0f}" if item.get('target_price') else "—"
-            tgt_30d = f"₹{item.get('monthly_target_price', 0):,.0f}" if item.get('monthly_target_price') else "—"
-            sl = f"₹{item.get('stop_loss_price', 0):,.0f}" if item.get('stop_loss_price') else "—"
-            win_rate = item.get("win_rate", 70.0)
+            daily_tgt = f"₹{item.get('daily_target_price', 0):,.0f}" if item.get('daily_target_price') else "—"
+            daily_sl = f"₹{item.get('daily_stop_loss_price', 0):,.0f}" if item.get('daily_stop_loss_price') else "—"
+            weekly_tgt = f"₹{item.get('weekly_target_price', 0):,.0f}" if item.get('weekly_target_price') else "—"
             conf = item.get("confidence_score", 75)
-            cnt = item.get("trades_count", 0)
-            tag = f"({cnt} trades)" if cnt > 0 else ""
-            pe_val = f"{item.get('pe_ratio', 22.0):.1f}" if item.get('pe_ratio') else "—"
-            pb_val = f"{item.get('pb_ratio', 2.8):.1f}" if item.get('pb_ratio') else "—"
-            news_lbl = item.get("news_sentiment", "NEUTRAL 🟡")
-
-            daily_tgt = f"₹{item.get('daily_target_price', 0):,.0f}" if item.get('daily_target_price') else tgt_15d
-            daily_sl = f"₹{item.get('daily_stop_loss_price', 0):,.0f}" if item.get('daily_stop_loss_price') else sl
-            weekly_tgt = f"₹{item.get('weekly_target_price', 0):,.0f}" if item.get('weekly_target_price') else tgt_15d
-            monthly_tgt = f"₹{item.get('monthly_target_price', 0):,.0f}" if item.get('monthly_target_price') else tgt_30d
-
-            fii = item.get("fii_holding")
-            dii = item.get("dii_holding")
-            retail = item.get("retail_holding")
-            q_prof = item.get("quarterly_profit")
-            q_gr = item.get("quarterly_growth")
-            fund_parts = []
-            if fii is not None and dii is not None:
-                fund_parts.append(f"FII: {fii:.0f}% · DII: {dii:.0f}% · Retail: {retail or 0:.0f}%")
-            if q_prof is not None:
-                gr_sign = "+" if q_gr and q_gr > 0 else ""
-                fund_parts.append(f"Qtr Profit: ₹{q_prof:,.0f} Cr ({gr_sign}{q_gr or 0:.0f}% YoY)")
-            fund_str = f"   📊 {' | '.join(fund_parts)}\n" if fund_parts else ""
-
             lines.append(
-                f"{idx}. {icon} <b>{sym}</b> · <b>{label}</b>\n"
-                f"   CMP: {curr} ➔ ⚡ <b>Next-Day: {daily_tgt}</b> (SL: {daily_sl})\n"
-                f"   📅 <b>Weekly: {weekly_tgt}</b> | 🗓️ <b>Monthly: {monthly_tgt}</b> [<b>RR: 1:3</b>]\n"
-                f"{fund_str}"
-                f"   📰 News: {news_lbl} · P/E: {pe_val} (P/B: {pb_val}x)\n"
-                f"   🎯 Win Rate: <b>{win_rate:.0f}%</b> {tag} · Conf: {conf}%"
+                f"{idx}. 🟢 <b>{sym}</b> · <b>{label}</b>\n"
+                f"   CMP: {curr} ➔ 🎯 <b>Tgt: {weekly_tgt}</b> (SL: {daily_sl}) [<b>RR: 1:3</b>]\n"
+                f"   ⚡ Next-Day Tgt: {daily_tgt} · Conf: <b>{conf}%</b>"
             )
-    else:
-        lines.append("")
-        lines.append("🎯 <b>HIGH-CONVICTION CALLS:</b> <i>No fresh buy breakouts today. Market in consolidation.</i>")
 
-    # 2. Compact Neutral / Hold Watchlist (One-liner per stock for mobile clarity)
+    # 2. High-Conviction Short Calls
+    if bearish_stocks:
+        lines.append("")
+        lines.append("🔴 <b>HIGH-CONVICTION SHORT CALLS (BEARISH):</b>")
+        for idx, item in enumerate(bearish_stocks, start=1):
+            sym = item.get("symbol", "").replace(".NS", "")
+            action = item.get("action", "")
+            label = "STRONG SELL" if action == "STRONG_SELL" else "SELL"
+            curr = f"₹{item.get('current_price', 0):,.0f}"
+            daily_tgt = f"₹{item.get('daily_target_price', 0):,.0f}" if item.get('daily_target_price') else "—"
+            daily_sl = f"₹{item.get('daily_stop_loss_price', 0):,.0f}" if item.get('daily_stop_loss_price') else "—"
+            weekly_tgt = f"₹{item.get('weekly_target_price', 0):,.0f}" if item.get('weekly_target_price') else "—"
+            conf = item.get("confidence_score", 75)
+            lines.append(
+                f"{idx}. 🔴 <b>{sym}</b> · <b>{label}</b>\n"
+                f"   CMP: {curr} ➔ 🛑 <b>Downside Tgt: {weekly_tgt}</b> (Protective SL: {daily_sl}) [<b>RR: 1:3</b>]\n"
+                f"   ⚡ Next-Day Downside: {daily_tgt} · Conf: <b>{conf}%</b>"
+            )
+
+    # 3. Compact Neutral / Hold Watchlist
     if neutral_stocks:
         lines.append("")
-        lines.append("⏸️ <b>NEUTRAL / HOLD STOCKS (19 Tracked):</b>")
+        lines.append("⏸️ <b>NEUTRAL / HOLD STOCKS (Watchlist):</b>")
         for item in neutral_stocks:
             sym = item.get("symbol", "").replace(".NS", "")
             curr = f"₹{item.get('current_price', 0):,.0f}"
-            tgt = f"₹{item.get('weekly_target_price', item.get('target_price', 0)):,.0f}"
-            win_rate = item.get("win_rate", 60.0)
-            pe_str = f"P/E {item.get('pe_ratio', 22):.0f}" if item.get('pe_ratio') else ""
-            lines.append(f"• 🟡 <b>{sym}</b>: {curr} ➔ Tgt {tgt} ({pe_str} | Win: {win_rate:.0f}%)")
+            act = item.get("action", "HOLD")
+            lines.append(f"• 🟡 <b>{sym}</b>: {curr} ({act})")
 
     # 3. Resolved Audits Today (Which day prediction was made, which day target/stop loss was hit)
     lines.append("")

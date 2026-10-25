@@ -377,8 +377,11 @@
 
 <!-- CLEAN TAB SELECTOR -->
 <div class="tab-controls">
-  <button class="tab-btn active" onclick="switchDashboardTab('ai-picks', this)">
-    🎯 AI High-Conviction Calls ({{ active_predictions|length }})
+  <button class="tab-btn active" onclick="switchDashboardTab('matrix-picks', this)">
+    📊 19-Stock Strategy Matrix (All Checks)
+  </button>
+  <button class="tab-btn" onclick="switchDashboardTab('ai-picks', this)">
+    🎯 High-Conviction AI Calls ({{ active_predictions|length }})
   </button>
   <button class="tab-btn" onclick="switchDashboardTab('mf-picks', this)">
     🏦 Mutual Fund Favorites
@@ -388,11 +391,193 @@
   </button>
 </div>
 
+<!-- TAB 0: 19-STOCK MULTI-STRATEGY CONFLUENCE MATRIX -->
+<div id="tab-matrix-picks" class="dashboard-tab-content">
+  <!-- Matrix Filter Toolbar -->
+  <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+      <span style="font-size: 0.82rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.25rem;">Filter Action:</span>
+      <button class="btn btn-sm matrix-filter-btn active" onclick="filterMatrixRows('ALL', this)" style="border-radius: 9999px; padding: 0.3rem 0.85rem; font-size: 0.78rem;">
+        All Stocks ({{ strategy_matrix|length }})
+      </button>
+      <button class="btn btn-sm matrix-filter-btn" onclick="filterMatrixRows('BULLISH', this)" style="border-radius: 9999px; padding: 0.3rem 0.85rem; font-size: 0.78rem; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.35);">
+        🟢 Bullish Buys ({{ bullish_count }})
+      </button>
+      <button class="btn btn-sm matrix-filter-btn" onclick="filterMatrixRows('BEARISH', this)" style="border-radius: 9999px; padding: 0.3rem 0.85rem; font-size: 0.78rem; background: rgba(225, 29, 72, 0.15); color: #fb7185; border: 1px solid rgba(225, 29, 72, 0.35);">
+        🔴 Bearish Shorts ({{ bearish_count }})
+      </button>
+      <button class="btn btn-sm matrix-filter-btn" onclick="filterMatrixRows('NEUTRAL', this)" style="border-radius: 9999px; padding: 0.3rem 0.85rem; font-size: 0.78rem; background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.35);">
+        🟡 Neutral / Hold ({{ neutral_count }})
+      </button>
+    </div>
+    
+    <div style="position: relative; min-width: 260px;">
+      <input 
+        type="text" 
+        id="matrixFilterInput" 
+        placeholder="Search stock symbol..." 
+        onkeyup="searchMatrixRows()"
+        style="width: 100%; padding: 0.5rem 0.85rem 0.5rem 2rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none;"
+      >
+      <span style="position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: var(--text-dim);">🔍</span>
+    </div>
+  </div>
+
+  <!-- Responsive Confluence Table -->
+  <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-color); border-radius: 16px; overflow-x: auto; box-shadow: var(--shadow-card);">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;" id="matrixTable">
+      <thead>
+        <tr style="background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid var(--border-color); color: var(--text-dim); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em;">
+          <th style="padding: 1rem 1.25rem;">Stock & Price</th>
+          <th style="padding: 1rem 0.75rem;">1. Trend (EMA)</th>
+          <th style="padding: 1rem 0.75rem;">2. Momentum</th>
+          <th style="padding: 1rem 0.75rem;">3. Smart Money</th>
+          <th style="padding: 1rem 0.75rem;">4. CAN SLIM P&L</th>
+          <th style="padding: 1rem 0.75rem;">5. News Catalyst</th>
+          <th style="padding: 1rem 0.75rem;">6. Stage</th>
+          <th style="padding: 1rem 0.75rem; text-align: center;">Confluence</th>
+          <th style="padding: 1rem 1rem;">Final AI Call</th>
+          <th style="padding: 1rem 1rem;">Targets & SL</th>
+          <th style="padding: 1rem 1rem; text-align: right;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in strategy_matrix %}
+        <tr class="matrix-row" data-direction="{{ row.direction }}" data-symbol="{{ row.symbol }}" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.2s ease;">
+          <!-- Stock & Price -->
+          <td style="padding: 1rem 1.25rem;">
+            <div style="font-weight: 800; color: #fff; font-size: 0.95rem;">{{ row.symbol|cut:".NS" }}</div>
+            <div style="font-size: 0.72rem; color: var(--text-dim);">{{ row.name|truncatewords:3 }}</div>
+            <div style="font-family: var(--font-mono); font-weight: 700; color: #38bdf8; font-size: 0.92rem; margin-top: 0.2rem;">
+              ₹{{ row.cmp|floatformat:2 }}
+            </div>
+          </td>
+
+          <!-- 1. Trend -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'BULLISH' in row.trend_signal %}
+            <span class="badge badge-strong-buy" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BULLISH 🟢</span>
+            {% elif 'BEARISH' in row.trend_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BEARISH 🔴</span>
+            {% else %}
+            <span class="badge badge-hold" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">NEUTRAL 🟡</span>
+            {% endif %}
+          </td>
+
+          <!-- 2. Momentum -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'BULLISH' in row.momentum_signal %}
+            <span class="badge badge-strong-buy" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BULLISH 🟢</span>
+            {% elif 'BEARISH' in row.momentum_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BEARISH 🔴</span>
+            {% elif 'OVERBOUGHT' in row.momentum_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">O-BOUGHT ⚠️</span>
+            {% elif 'OVERSOLD' in row.momentum_signal %}
+            <span class="badge badge-accumulate" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">O-SOLD ⚠️</span>
+            {% else %}
+            <span class="badge badge-hold" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">NEUTRAL 🟡</span>
+            {% endif %}
+          </td>
+
+          <!-- 3. Smart Money -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'INFLOW' in row.smart_money_signal %}
+            <span class="badge badge-strong-buy" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">INFLOW 🟢</span>
+            {% elif 'OUTFLOW' in row.smart_money_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">OUTFLOW 🔴</span>
+            {% else %}
+            <span class="badge badge-hold" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">HOLD ⚖️</span>
+            {% endif %}
+          </td>
+
+          <!-- 4. Fundamentals -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'STRONG' in row.fundamental_signal %}
+            <span class="badge badge-strong-buy" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">GROWTH 🟢</span>
+            {% elif 'WEAK' in row.fundamental_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">WEAK 🔴</span>
+            {% else %}
+            <span class="badge badge-hold" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">STABLE 🟡</span>
+            {% endif %}
+          </td>
+
+          <!-- 5. News Sentiment -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'BULLISH' in row.news_signal %}
+            <span class="badge badge-strong-buy" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BULL 🟢</span>
+            {% elif 'BEARISH' in row.news_signal %}
+            <span class="badge badge-avoid" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">BEAR 🔴</span>
+            {% else %}
+            <span class="badge badge-hold" style="font-size: 0.68rem; padding: 0.2rem 0.5rem;">NEUT 🟡</span>
+            {% endif %}
+          </td>
+
+          <!-- 6. Stage -->
+          <td style="padding: 1rem 0.75rem;">
+            {% if 'Stage 2' in row.stage_signal %}
+            <span style="font-weight: 700; color: var(--accent-green); font-size: 0.82rem;">Stage 2 🟢</span>
+            {% elif 'Stage 4' in row.stage_signal %}
+            <span style="font-weight: 700; color: var(--accent-rose); font-size: 0.82rem;">Stage 4 🔴</span>
+            {% else %}
+            <span style="font-weight: 600; color: var(--accent-amber); font-size: 0.82rem;">Stage 1/3 🟡</span>
+            {% endif %}
+          </td>
+
+          <!-- Confluence Score -->
+          <td style="padding: 1rem 0.75rem; text-align: center;">
+            <div style="display: inline-flex; gap: 0.4rem; font-family: var(--font-mono); font-weight: 700; font-size: 0.82rem; background: rgba(0,0,0,0.4); padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+              <span style="color: var(--accent-green);">🟢{{ row.bullish_signals_count }}</span>
+              <span style="color: var(--text-dim);">/</span>
+              <span style="color: var(--accent-rose);">🔴{{ row.bearish_signals_count }}</span>
+            </div>
+          </td>
+
+          <!-- Final AI Call -->
+          <td style="padding: 1rem 1rem;">
+            {% if row.action == 'STRONG_BUY' %}
+            <span class="badge badge-strong-buy">STRONG BUY 🟢</span>
+            {% elif row.action == 'ACCUMULATE' %}
+            <span class="badge badge-accumulate">ACCUMULATE 📈</span>
+            {% elif row.action == 'STRONG_SELL' %}
+            <span class="badge badge-strong-sell">STRONG SELL 🔴</span>
+            {% elif row.action == 'SELL' %}
+            <span class="badge badge-sell">SELL / TRIM 📉</span>
+            {% elif row.action == 'HOLD' %}
+            <span class="badge badge-hold">HOLD / WAIT 🟡</span>
+            {% else %}
+            <span class="badge badge-avoid">AVOID ⛔</span>
+            {% endif %}
+          </td>
+
+          <!-- Targets & Stop Loss -->
+          <td style="padding: 1rem 1rem; font-family: var(--font-mono); font-size: 0.82rem;">
+            {% if row.direction == 'BEARISH' %}
+            <div><span style="color: var(--text-dim);">Downside:</span> <strong style="color: #fb7185;">₹{{ row.target_price|floatformat:1 }}</strong> <span style="font-size: 0.7rem; color: #fb7185;">(-{{ row.expected_return_pct|floatformat:1 }}%)</span></div>
+            <div><span style="color: var(--text-dim);">Stop-Loss:</span> <strong style="color: var(--text-muted);">₹{{ row.stop_loss_price|floatformat:1 }}</strong> <span style="font-size: 0.7rem; color: var(--accent-rose);">(+{{ row.max_risk_pct|floatformat:1 }}%)</span></div>
+            {% else %}
+            <div><span style="color: var(--text-dim);">Target:</span> <strong style="color: var(--accent-green);">₹{{ row.target_price|floatformat:1 }}</strong> <span style="font-size: 0.7rem; color: var(--accent-green);">(+{{ row.expected_return_pct|floatformat:1 }}%)</span></div>
+            <div><span style="color: var(--text-dim);">Stop-Loss:</span> <strong style="color: var(--accent-rose);">₹{{ row.stop_loss_price|floatformat:1 }}</strong> <span style="font-size: 0.7rem; color: var(--accent-rose);">(-{{ row.max_risk_pct|floatformat:1 }}%)</span></div>
+            {% endif %}
+          </td>
+
+          <!-- Deep Dive Link -->
+          <td style="padding: 1rem 1rem; text-align: right;">
+            <a href="{% url 'stock_analyzer:stock_detail' row.symbol %}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;">
+              Inspect →
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <!-- TAB 1: AI HIGH CONVICTION PREDICTIONS -->
-<div id="tab-ai-picks" class="dashboard-tab-content">
+<div id="tab-ai-picks" class="dashboard-tab-content" style="display: none;">
   <div class="grid-3">
     {% for pred in active_predictions %}
-    <div class="stock-card">
+    <div class="stock-card" style="border-left: 4px solid {% if pred.direction == 'BEARISH' %}#e11d48{% elif pred.action == 'STRONG_BUY' %}#10b981{% else %}#06b6d4{% endif %};">
       <div>
         <div class="card-top">
           <div>
@@ -400,11 +585,17 @@
             <div class="stock-name">{{ pred.stock.name }}</div>
           </div>
           {% if pred.action == 'STRONG_BUY' %}
-          <span class="badge badge-strong-buy">STRONG BUY</span>
+          <span class="badge badge-strong-buy">STRONG BUY 🟢</span>
           {% elif pred.action == 'ACCUMULATE' %}
-          <span class="badge badge-accumulate">ACCUMULATE</span>
+          <span class="badge badge-accumulate">ACCUMULATE 📈</span>
+          {% elif pred.action == 'STRONG_SELL' %}
+          <span class="badge badge-strong-sell">STRONG SELL 🔴</span>
+          {% elif pred.action == 'SELL' %}
+          <span class="badge badge-sell">SELL / SHORT 📉</span>
+          {% elif pred.action == 'HOLD' %}
+          <span class="badge badge-hold">HOLD / WAIT 🟡</span>
           {% else %}
-          <span class="badge badge-hold">{{ pred.action }}</span>
+          <span class="badge badge-avoid">{{ pred.action }}</span>
           {% endif %}
         </div>
 
@@ -417,33 +608,37 @@
 
         <div class="mini-pills">
           <div class="mini-pill-item">
-            <span class="mini-pill-label">🎯 TARGET</span>
-            <span class="mini-pill-val" style="color: var(--accent-green);">
-              ₹{{ pred.target_price|floatformat:1 }} (+{{ pred.expected_return_pct }}%)
+            <span class="mini-pill-label">
+              {% if pred.direction == 'BEARISH' %}🛑 SHORT TARGET{% else %}🎯 LONG TARGET{% endif %}
+            </span>
+            <span class="mini-pill-val" style="color: {% if pred.direction == 'BEARISH' %}#fb7185{% else %}var(--accent-green){% endif %};">
+              ₹{{ pred.target_price|floatformat:1 }} ({% if pred.direction == 'BEARISH' %}-{% else %}+{% endif %}{{ pred.expected_return_pct }}%)
             </span>
           </div>
           <div class="mini-pill-item">
-            <span class="mini-pill-label">🛑 STOP LOSS</span>
+            <span class="mini-pill-label">
+              {% if pred.direction == 'BEARISH' %}🛡️ PROTECTIVE SL{% else %}🛑 STOP LOSS{% endif %}
+            </span>
             <span class="mini-pill-val" style="color: var(--accent-rose);">
-              ₹{{ pred.stop_loss_price|floatformat:1 }} (-{{ pred.max_risk_pct }}%)
+              ₹{{ pred.stop_loss_price|floatformat:1 }} ({% if pred.direction == 'BEARISH' %}+{% else %}-{% endif %}{{ pred.max_risk_pct }}%)
             </span>
           </div>
           <div class="mini-pill-item" style="grid-column: span 2; margin-top: 0.25rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.45rem;">
             <div style="display: flex; justify-content: space-between; font-size: 0.78rem;">
-              <span style="color: var(--text-dim);">Risk-Reward: <strong style="color: var(--accent-cyan);">{{ pred.risk_reward_ratio }}x</strong></span>
-              <span style="color: var(--text-dim);">Horizon: <strong style="color: #fff;">{{ pred.timeframe_days }} Days</strong></span>
+              <span style="color: var(--text-dim);">Confluence: <strong style="color: #fff;">🟢{{ pred.bullish_signals_count }} / 🔴{{ pred.bearish_signals_count }}</strong></span>
+              <span style="color: var(--text-dim);">Type: <strong style="color: var(--accent-cyan);">{{ pred.get_timeframe_type_display }}</strong></span>
             </div>
           </div>
         </div>
       </div>
 
-      <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem;">
+      <a href="{% url 'stock_analyzer:stock_detail' pred.stock.symbol %}" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem; margin-top: 1rem;">
         View Deep Dive Analysis →
       </a>
     </div>
     {% empty %}
     <p style="grid-column: span 3; text-align: center; color: var(--text-dim); padding: 2rem;">
-      No active predictions right now. Search any stock above to generate analysis.
+      No active calls right now. Check the 19-Stock Strategy Matrix tab for current setups.
     </p>
     {% endfor %}
   </div>
@@ -580,6 +775,37 @@
     const target = document.getElementById('tab-' + tabId);
     if (target) target.style.display = 'block';
     if (btnEl) btnEl.classList.add('active');
+  }
+
+  function filterMatrixRows(dir, btnEl) {
+    document.querySelectorAll('.matrix-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+
+    const rows = document.querySelectorAll('.matrix-row');
+    rows.forEach(r => {
+      const rowDir = r.getAttribute('data-direction');
+      if (dir === 'ALL' || rowDir === dir) {
+        r.style.display = '';
+      } else {
+        r.style.display = 'none';
+      }
+    });
+  }
+
+  function searchMatrixRows() {
+    const input = document.getElementById('matrixFilterInput');
+    const filter = input.value.toUpperCase();
+    const rows = document.querySelectorAll('.matrix-row');
+
+    rows.forEach(r => {
+      const sym = (r.getAttribute('data-symbol') || '').toUpperCase();
+      const text = r.innerText.toUpperCase();
+      if (sym.indexOf(filter) > -1 || text.indexOf(filter) > -1) {
+        r.style.display = '';
+      } else {
+        r.style.display = 'none';
+      }
+    });
   }
 </script>
 {% endblock %}

@@ -618,6 +618,19 @@ body {
   border: 1px solid rgba(244, 63, 94, 0.35);
 }
 
+.badge-strong-sell, .badge-short {
+  background: rgba(225, 29, 72, 0.2);
+  color: #fb7185;
+  border: 1px solid rgba(225, 29, 72, 0.45);
+  box-shadow: 0 0 12px rgba(225, 29, 72, 0.25);
+}
+
+.badge-sell, .badge-trim {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--accent-rose);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
 .badge-win {
   background: rgba(16, 185, 129, 0.15);
   color: var(--accent-green);
