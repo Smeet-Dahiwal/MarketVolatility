@@ -1,15 +1,15 @@
 {
-  "execution_time": "2026-11-05 18:15:24 IST",
+  "execution_time": "2026-11-06 17:39:55 IST",
   "stocks_updated": 19,
   "market_regime": "Healthy Trending Market (Selective Buying)",
   "active_predictions": 57,
   "bullish_calls_count": 5,
   "bearish_calls_count": 3,
   "neutral_calls_count": 11,
-  "total_completed": 6948,
-  "wins": 78,
-  "losses": 2479,
-  "expired": 4391,
-  "actionable_win_rate_percentage": 3.1,
+  "total_completed": 6970,
+  "wins": 82,
+  "losses": 2483,
+  "expired": 4405,
+  "actionable_win_rate_percentage": 3.2,
   "status": "SUCCESS"
 }
